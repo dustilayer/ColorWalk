@@ -19,9 +19,9 @@ function luminance(r, g, b) {
 
 // ── 单色模式色卡 ──────────────────────────────────────────────────
 
-function drawSingleCard(ctx, record, activeIndex = 0) {
+function drawSingleCard(ctx, record) {
   const { themeGradient, collectedColors, matchScore, date, strictLevel } = record
-  const hit = collectedColors[activeIndex] || collectedColors[0]
+  const hit = collectedColors[0]
 
   // 上半：主题渐变（60%）
   const gradH = Math.round(H * 0.6)
@@ -113,7 +113,7 @@ function drawFreeCard(ctx, record) {
 
 // ── 导出入口 ──────────────────────────────────────────────────────
 
-export async function downloadCard(record, activeIndex = 0) {
+export async function downloadCard(record) {
   await document.fonts.ready
 
   const canvas = document.createElement('canvas')
@@ -122,7 +122,7 @@ export async function downloadCard(record, activeIndex = 0) {
   const ctx = canvas.getContext('2d')
 
   if (record.mode === 'single') {
-    drawSingleCard(ctx, record, activeIndex)
+    drawSingleCard(ctx, record)
   } else {
     drawFreeCard(ctx, record)
   }
@@ -132,45 +132,4 @@ export async function downloadCard(record, activeIndex = 0) {
   a.href = url
   a.download = `colorwalk_${record.date.slice(0, 10)}.png`
   a.click()
-}
-
-export async function shareCard(record, activeIndex = 0) {
-  await document.fonts.ready
-
-  const canvas = document.createElement('canvas')
-  canvas.width = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')
-
-  if (record.mode === 'single') {
-    drawSingleCard(ctx, record, activeIndex)
-  } else {
-    drawFreeCard(ctx, record)
-  }
-
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(async (blob) => {
-      if (!blob) {
-        reject(new Error('Canvas to Blob failed'))
-        return
-      }
-      try {
-        const file = new File([blob], `colorwalk_${record.date.slice(0, 10)}.png`, { type: 'image/png' })
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            title: 'Color Walk',
-            text: '这是我的 Color Walk 漫步色卡',
-            files: [file]
-          })
-          resolve(true)
-        } else {
-          // Fallback if sharing files is not supported
-          resolve(false)
-        }
-      } catch (err) {
-        console.error('Share failed:', err)
-        reject(err)
-      }
-    }, 'image/png')
-  })
 }

@@ -1,4 +1,4 @@
-const KEY = 'colorwalk_archive_v4'
+const KEY = 'colorwalk_archive'
 
 export function getWalks() {
   try {

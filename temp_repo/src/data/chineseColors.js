@@ -1,0 +1,23 @@
+// 20 个中国传统色，HEX 值来源于《中国传统色》参考标准
+export const CHINESE_COLORS = [
+  { name: '胭脂', hex: '#C03030' },
+  { name: '朱砂', hex: '#C03020' },
+  { name: '赭石', hex: '#A0522D' },
+  { name: '砖红', hex: '#B05030' },
+  { name: '橘红', hex: '#E8601C' },
+  { name: '藤黄', hex: '#D4A017' },
+  { name: '明黄', hex: '#E8C840' },
+  { name: '草绿', hex: '#5A8A2C' },
+  { name: '竹青', hex: '#6A9A7A' },
+  { name: '碧色', hex: '#3A9A8A' },
+  { name: '石青', hex: '#2A6A8A' },
+  { name: '靛蓝', hex: '#1A3A6A' },
+  { name: '紫黛', hex: '#5A3A6A' },
+  { name: '藕荷', hex: '#C8A0B8' },
+  { name: '丁香紫', hex: '#9A7AAA' },
+  { name: '烟褐', hex: '#7A5A4A' },
+  { name: '墨色', hex: '#2A2A2A' },
+  { name: '银灰', hex: '#9A9A9A' },
+  { name: '月白', hex: '#E8EEF5' },
+  { name: '象牙白', hex: '#F5F0E0' },
+]

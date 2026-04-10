@@ -1,10 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { motion } from 'motion/react'
-import { generateTheme, getSeason, getChineseDate, SEASON_LABELS, generateMonochromatic } from '../utils/seasonColors'
+import { generateTheme, getSeason, getChineseDate, SEASON_LABELS } from '../utils/seasonColors'
 import { findNearestColor, hexToRgb } from '../utils/colorUtils'
-import { playClick, playChime } from '../utils/audio'
-import { Settings } from 'lucide-react'
-import { useLanguage } from '../contexts/LanguageContext'
 
 // 根据渐变两端均值亮度决定叠加文字颜色
 function textColors(startHex, endHex) {
@@ -17,64 +13,35 @@ function textColors(startHex, endHex) {
 
 function ColorSwatch({ hex, onChange, label }) {
   return (
-    <motion.div 
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}
-      whileHover={{ scale: 1.1, y: -4 }}
-      whileTap={{ scale: 0.95 }}
-      whileFocus={{ scale: 1.1, y: -4 }}
-    >
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
       <label style={{ position: 'relative', cursor: 'pointer' }}>
-        <motion.div 
-          style={{
-            width: 52, height: 52, borderRadius: 10,
-            backgroundColor: hex,
-            border: '1.5px solid rgba(255,255,255,0.5)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-          }} 
-          whileHover={{ boxShadow: '0 8px 20px rgba(0,0,0,0.15)' }}
-        />
+        <div style={{
+          width: 52, height: 52, borderRadius: 10,
+          backgroundColor: hex,
+          border: '1.5px solid rgba(255,255,255,0.5)',
+        }} />
         <input
-          type="color" value={hex} onChange={e => {
-            onChange(e.target.value);
-          }}
+          type="color" value={hex} onChange={e => onChange(e.target.value)}
           style={{ position: 'absolute', opacity: 0, inset: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
-          onFocus={(e) => e.target.previousSibling.style.boxShadow = '0 0 0 3px rgba(255,255,255,0.8)'}
-          onBlur={(e) => e.target.previousSibling.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'}
         />
       </label>
       <span style={{ fontFamily: '"Noto Serif SC", Georgia, serif', fontSize: '0.75rem', color: 'rgba(255,255,255,0.75)', letterSpacing: '0.08em' }}>
         {label}
       </span>
-    </motion.div>
+    </div>
   )
 }
 
-export default function ThemeGenPage({ onNext, onOpenSettings }) {
-  const { t } = useLanguage()
+export default function ThemeGenPage({ onNext }) {
   const season = getSeason()
   const [theme, setTheme]     = useState(() => generateTheme(season))
   const [customOpen, setCustomOpen] = useState(false)
   const [customStart, setCustomStart] = useState(theme.start.hex)
   const [customEnd,   setCustomEnd]   = useState(theme.end.hex)
-  const [bgAngle] = useState(() => Math.floor(Math.random() * 360))
 
   const canvasRef  = useRef(null)
   const ripplesRef = useRef([])   // [{x,y,maxR,startTime,duration,alpha}]
   const rafRef     = useRef(null)
-
-  const handleStartChange = (hex) => {
-    setCustomStart(hex)
-    const mono = generateMonochromatic(hex, true)
-    setCustomEnd(mono.hex)
-    playChime(400 + Math.random() * 400)
-  }
-
-  const handleEndChange = (hex) => {
-    setCustomEnd(hex)
-    const mono = generateMonochromatic(hex, false)
-    setCustomStart(mono.hex)
-    playChime(400 + Math.random() * 400)
-  }
 
   // ── Canvas 涟漪动画 ──────────────────────────────────────────────
   useEffect(() => {
@@ -155,23 +122,19 @@ export default function ThemeGenPage({ onNext, onOpenSettings }) {
   const tc = textColors(displayTheme.start.hex, displayTheme.end.hex)
 
   return (
+    // 全屏渐变背景，background-position 动画产生流动感
     <div
-      style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: `linear-gradient(135deg, ${displayTheme.start.hex}, ${displayTheme.end.hex}, ${displayTheme.start.hex})`,
+        backgroundSize: '300% 300%',
+        animation: 'gradientFlow 8s ease-in-out infinite',
+        overflow: 'hidden',
+      }}
       onMouseDown={handlePointerDown}
       onTouchStart={handlePointerDown}
     >
-      {/* 全屏渐变背景，background-position 动画产生流动感 */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: -200, // 扩大范围防止旋转时露边
-          backgroundImage: `linear-gradient(${bgAngle}deg, ${displayTheme.start.hex}, ${displayTheme.end.hex}, ${displayTheme.start.hex})`,
-          backgroundSize: '300% 300%',
-          animation: 'gradientFlow 30s ease-in-out infinite, rotateBg 45s linear infinite',
-          filter: 'blur(60px)',
-          zIndex: -1,
-        }}
-      />
       {/* Canvas：涟漪层，pointer-events:none 让点击穿透 */}
       <canvas
         ref={canvasRef}
@@ -187,40 +150,15 @@ export default function ThemeGenPage({ onNext, onOpenSettings }) {
         zIndex: 1,
       }}>
         <p style={{ fontFamily: '"Noto Serif SC", Georgia, serif', fontSize: '0.78rem', color: tc.sub, margin: 0, letterSpacing: '0.22em' }}>
-          {t('season' + season.charAt(0).toUpperCase() + season.slice(1)) || SEASON_LABELS[season]}
+          {SEASON_LABELS[season]}
         </p>
         <h1 style={{ fontFamily: '"Noto Serif SC", Georgia, serif', fontSize: '2rem', fontWeight: 400, color: tc.main, margin: '0.35rem 0 0', letterSpacing: '0.05em' }}>
-          {t('todayTheme')}
+          今日主题色
         </h1>
         <p style={{ fontFamily: '"Noto Serif SC", Georgia, serif', fontSize: '0.8rem', color: tc.sub, margin: '0.4rem 0 0', letterSpacing: '0.1em' }}>
           {getChineseDate()}
         </p>
       </div>
-
-      {/* 右上角设置按钮 */}
-      <motion.button
-        style={{
-          position: 'absolute',
-          top: 'calc(3.5rem + env(safe-area-inset-top))',
-          right: '1.5rem',
-          zIndex: 10,
-          background: 'rgba(0,0,0,0.15)',
-          border: 'none',
-          borderRadius: '50%',
-          width: 40,
-          height: 40,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          backdropFilter: 'blur(8px)',
-        }}
-        onClick={(e) => { e.stopPropagation(); playClick(); onOpenSettings(); }}
-        whileHover={{ scale: 1.1, backgroundColor: 'rgba(0,0,0,0.25)' }}
-        whileTap={{ scale: 0.9 }}
-      >
-        <Settings size={20} color={tc.main} />
-      </motion.button>
 
       {/* 底部浮层 */}
       <div
@@ -241,12 +179,12 @@ export default function ThemeGenPage({ onNext, onOpenSettings }) {
         {customOpen && (
           <div style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', paddingBottom: '1rem', marginBottom: '0.875rem' }}>
             <p style={{ fontFamily: '"Noto Serif SC", Georgia, serif', fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', margin: '0 0 0.875rem', textAlign: 'center', letterSpacing: '0.05em' }}>
-              {t('selectColor')}
+              点击色块选择颜色
             </p>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem' }}>
-              <ColorSwatch hex={customStart} onChange={handleStartChange} label={hexToName(customStart)} />
+              <ColorSwatch hex={customStart} onChange={setCustomStart} label={hexToName(customStart)} />
               <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '1.1rem' }}>→</span>
-              <ColorSwatch hex={customEnd}   onChange={handleEndChange}   label={hexToName(customEnd)}   />
+              <ColorSwatch hex={customEnd}   onChange={setCustomEnd}   label={hexToName(customEnd)}   />
             </div>
           </div>
         )}
@@ -259,32 +197,20 @@ export default function ThemeGenPage({ onNext, onOpenSettings }) {
 
         {/* 操作文字链接 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.875rem' }}>
-          <motion.button 
-            style={s.btnLink} 
-            onClick={(e) => { handleRegenerate(e); playClick(); }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >{t('regen')}</motion.button>
+          <button style={s.btnLink} onClick={handleRegenerate}>重新生成</button>
           <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>·</span>
-          <motion.button 
-            style={s.btnLink} 
-            onClick={e => { e.stopPropagation(); setCustomOpen(v => !v); playClick(); }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {customOpen ? t('collapse') : t('customGradient')}
-          </motion.button>
+          <button style={s.btnLink} onClick={e => { e.stopPropagation(); setCustomOpen(v => !v) }}>
+            {customOpen ? '收起' : '自定义色带'}
+          </button>
         </div>
 
         {/* 开始漫步：半透明白色 */}
-        <motion.button
+        <button
           style={s.btnStart}
-          onClick={e => { e.stopPropagation(); onNext(displayTheme); playClick(); }}
-          whileHover={{ scale: 1.02, backgroundColor: 'rgba(255,255,255,0.95)' }}
-          whileTap={{ scale: 0.98 }}
+          onClick={e => { e.stopPropagation(); onNext(displayTheme) }}
         >
-          {t('startWalk')}
-        </motion.button>
+          开始漫步
+        </button>
       </div>
     </div>
   )

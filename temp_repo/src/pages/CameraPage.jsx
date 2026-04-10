@@ -1,42 +1,34 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { motion } from 'motion/react'
 import { findNearestColor, rgbToHex, computeMatchScore } from '../utils/colorUtils'
-import { playClick, playChime, playCaptureSound } from '../utils/audio'
-import { SwitchCamera, Undo2, Redo2 } from 'lucide-react'
-import { useLanguage } from '../contexts/LanguageContext'
 
 function lerp(a, b, t) {
   return Math.round(a + (b - a) * t)
 }
 
 export default function CameraPage({ walkConfig, onEnd, onArchive }) {
-  const { t } = useLanguage()
   const { themeGradient, mode, strictLevel } = walkConfig
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const rafRef = useRef(null)
   const smoothRef = useRef({ r: 128, g: 128, b: 128 })
 
-  const [liveColor, setLiveColor] = useState({ r: 128, g: 128, b: 128, hex: '#808080', name: '' })
+  const [liveColor, setLiveColor] = useState({ r: 128, g: 128, b: 128, hex: '#808080', name: '银灰' })
   const [captureState, setCaptureState] = useState('idle') // 'idle' | 'captured'
   const [collectedColors, setCollectedColors] = useState([])
-  const [redoStack, setRedoStack] = useState([])
   const [lastCapture, setLastCapture] = useState(null) // {color + photoUrl}
   const [error, setError] = useState(null)
-  const [facingMode, setFacingMode] = useState('environment') // 'environment' | 'user'
-  const [flash, setFlash] = useState(false)
 
   useEffect(() => {
     let stream = null
     async function startCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         })
         if (videoRef.current) videoRef.current.srcObject = stream
       } catch (err) {
-        setError(t('cameraError'))
+        setError('无法访问摄像头，请检查浏览器权限设置。')
         console.error(err)
       }
     }
@@ -45,12 +37,7 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
       if (stream) stream.getTracks().forEach((t) => t.stop())
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [facingMode, t])
-
-  const toggleCamera = () => {
-    playClick()
-    setFacingMode(prev => prev === 'environment' ? 'user' : 'environment')
-  }
+  }, [])
 
   const sample = useCallback(() => {
     const video = videoRef.current
@@ -62,12 +49,6 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
-    
-    // Handle mirroring for front camera
-    if (facingMode === 'user') {
-      ctx.translate(canvas.width, 0)
-      ctx.scale(-1, 1)
-    }
     ctx.drawImage(video, 0, 0)
 
     const cx = Math.floor(canvas.width / 2)
@@ -86,7 +67,7 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
     s.b = lerp(s.b, Math.round(sumB / pixels), 0.15)
     setLiveColor({ r: s.r, g: s.g, b: s.b, hex: rgbToHex(s.r, s.g, s.b), name: findNearestColor(s.r, s.g, s.b) })
     rafRef.current = requestAnimationFrame(sample)
-  }, [facingMode])
+  }, [])
 
   const handleVideoPlay = useCallback(() => {
     rafRef.current = requestAnimationFrame(sample)
@@ -100,24 +81,11 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
     const H = Math.round(video.videoHeight * (W / video.videoWidth))
     const cap = document.createElement('canvas')
     cap.width = W; cap.height = H
-    const ctx = cap.getContext('2d')
-    if (facingMode === 'user') {
-      ctx.translate(W, 0)
-      ctx.scale(-1, 1)
-    }
-    ctx.drawImage(video, 0, 0, W, H)
+    cap.getContext('2d').drawImage(video, 0, 0, W, H)
     return cap.toDataURL('image/jpeg', 0.82)
   }
 
   function handleCapture() {
-    const matchScore = computeMatchScore({ r: smoothRef.current.r, g: smoothRef.current.g, b: smoothRef.current.b }, themeGradient)
-    const threshold = strictLevel === 'ambient' ? 40 : strictLevel === 'hunter' ? 80 : 100
-    if (matchScore < threshold) return;
-
-    playCaptureSound();
-    setFlash(true);
-    setTimeout(() => setFlash(false), 300);
-    
     const s = smoothRef.current
     const color = {
       r: s.r, g: s.g, b: s.b,
@@ -129,38 +97,14 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
 
     setLastCapture(entry)
     setCollectedColors((prev) => [...prev, entry]) // 始终追加，继续捕猎不会丢失旧照片
-    setRedoStack([]) // 清空重做栈
-    setCaptureState('captured')
-  }
-
-  function handleUndo() {
-    if (collectedColors.length === 0) return
-    playClick()
-    const newCollected = [...collectedColors]
-    const popped = newCollected.pop()
-    setCollectedColors(newCollected)
-    setRedoStack(prev => [...prev, popped])
-    setCaptureState('idle')
-  }
-
-  function handleRedo() {
-    if (redoStack.length === 0) return
-    playClick()
-    const newRedo = [...redoStack]
-    const popped = newRedo.pop()
-    setRedoStack(newRedo)
-    setCollectedColors(prev => [...prev, popped])
-    setLastCapture(popped)
     setCaptureState('captured')
   }
 
   function handleContinue() {
-    playClick();
     setCaptureState('idle')
   }
 
   function handleFinish() {
-    playClick();
     const score = strictLevel === 'precise' && collectedColors.length > 0
       ? computeMatchScore(collectedColors[collectedColors.length - 1], themeGradient)
       : null
@@ -174,30 +118,14 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
   const luminance = (0.299 * displayColor.r + 0.587 * displayColor.g + 0.114 * displayColor.b) / 255
   const textOnColor = luminance > 0.5 ? '#1A1714' : '#F5F0E8'
 
-  const matchScore = computeMatchScore({ r: liveColor.r, g: liveColor.g, b: liveColor.b }, themeGradient)
-  const threshold = strictLevel === 'ambient' ? 40 : strictLevel === 'hunter' ? 80 : 100
-  const canCapture = matchScore >= threshold
-  const highMatch = matchScore >= 80
+  const matchScore = strictLevel === 'precise'
+    ? computeMatchScore({ r: liveColor.r, g: liveColor.g, b: liveColor.b }, themeGradient)
+    : null
+  const highMatch = matchScore !== null && matchScore >= 80
 
   return (
     <div style={styles.root}>
-      <video 
-        ref={videoRef} 
-        autoPlay 
-        playsInline 
-        muted 
-        onPlay={handleVideoPlay} 
-        style={{
-          ...styles.video,
-          transform: facingMode === 'user' ? 'scaleX(-1)' : 'none'
-        }} 
-      />
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: flash ? 0.8 : 0 }}
-        transition={{ duration: 0.2 }}
-        style={{ position: 'absolute', inset: 0, backgroundColor: 'white', pointerEvents: 'none', zIndex: 10 }}
-      />
+      <video ref={videoRef} autoPlay playsInline muted onPlay={handleVideoPlay} style={styles.video} />
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       {error && <div style={styles.errorBanner}>{error}</div>}
 
@@ -208,91 +136,42 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
           background: `linear-gradient(to right, ${themeGradient.start.hex}, ${themeGradient.end.hex})`,
         }} />
         <div style={{ flex: 1 }} />
-        {collectedColors.length > 0 && (
-          <motion.button 
-            style={styles.iconBtn} 
-            onClick={handleUndo}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-          >
-            <Undo2 size={18} color="#1A1714" />
-          </motion.button>
-        )}
-        {redoStack.length > 0 && (
-          <motion.button 
-            style={styles.iconBtn} 
-            onClick={handleRedo}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-          >
-            <Redo2 size={18} color="#1A1714" />
-          </motion.button>
-        )}
         {count > 0 && (
           <div style={styles.countBadge}>
             <span style={styles.countText}>{count}</span>
           </div>
         )}
-        <motion.button 
-          style={styles.iconBtn} 
-          onClick={toggleCamera}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-        >
-          <SwitchCamera size={20} color="#1A1714" />
-        </motion.button>
-        <motion.button 
-          style={styles.archiveBtn} 
-          onClick={() => { onArchive(); playClick(); }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >{t('archive')}</motion.button>
+        <button style={styles.archiveBtn} onClick={onArchive}>档案</button>
       </div>
 
-        {/* 准星区 */}
-        <div style={styles.reticleWrap}>
-          <div style={{ ...styles.scoreWrap, opacity: canCapture ? 1 : 0.5, backgroundColor: canCapture ? 'rgba(245,240,232,0.9)' : 'rgba(245,240,232,0.4)' }}>
-            <span style={styles.scoreText}>{matchScore}% / {threshold}%</span>
+      {/* 准星区 */}
+      <div style={styles.reticleWrap}>
+        {matchScore !== null && (
+          <div style={styles.scoreWrap}>
+            <span style={{ ...styles.scoreText, opacity: highMatch ? 1 : 0.65 }}>{matchScore}%</span>
           </div>
-          <motion.div 
-            animate={flash ? { scale: [1, 0.8, 1.3, 1] } : { scale: 1 }}
-            transition={{ duration: 0.4 }}
-            style={{
-              ...styles.reticle,
-              borderColor: canCapture ? liveColor.hex : 'rgba(245,240,232,0.4)',
-              boxShadow: canCapture
-                ? `0 0 0 1.5px ${liveColor.hex}, 0 0 14px ${liveColor.hex}55`
-                : `0 0 0 1px rgba(0,0,0,0.1), 0 0 0 2px rgba(245,240,232,0.3)`,
-              transition: 'all 0.4s ease-in-out',
-            }} 
-          />
-        </div>
+        )}
+        <div style={{
+          ...styles.reticle,
+          borderColor: highMatch ? liveColor.hex : 'rgba(245,240,232,0.85)',
+          boxShadow: highMatch
+            ? `0 0 0 1.5px ${liveColor.hex}, 0 0 14px ${liveColor.hex}55`
+            : `0 0 0 1px rgba(0,0,0,0.3), 0 0 0 2px rgba(245,240,232,0.8)`,
+          transition: 'border-color 0.4s ease-in-out, box-shadow 0.4s ease-in-out',
+        }} />
+      </div>
 
       {/* 底部面板 */}
-      <div style={{
-        ...styles.panel,
-        ...(captureState === 'captured' && count > 0 ? {
-          backgroundColor: 'rgba(245,240,232,0.35)',
-          backdropFilter: 'blur(40px)',
-          WebkitBackdropFilter: 'blur(40px)',
-          transition: 'background-color 0.3s ease, backdrop-filter 0.3s ease',
-        } : {
-          transition: 'background-color 0.3s ease, backdrop-filter 0.3s ease',
-        })
-      }}>
+      <div style={styles.panel}>
         {/* 色值行 */}
         <div style={styles.colorRow}>
-          <motion.div 
-            animate={flash ? { scale: [1, 0.9, 1.1, 1] } : { scale: 1 }}
-            transition={{ duration: 0.4 }}
-            style={{
-              ...styles.swatch,
-              backgroundColor: displayColor.hex,
-              transition: 'background-color 0.4s ease-in-out',
-            }}
-          >
+          <div style={{
+            ...styles.swatch,
+            backgroundColor: displayColor.hex,
+            transition: 'background-color 0.4s ease-in-out',
+          }}>
             <span style={{ ...styles.swatchName, color: textOnColor }}>{displayColor.name}</span>
-          </motion.div>
+          </div>
           <div style={styles.info}>
             <span style={styles.hex}>{displayColor.hex}</span>
             <div style={styles.rgb}>
@@ -306,26 +185,11 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
         {/* 操作按钮行 */}
         <div style={styles.actionRow}>
           {captureState === 'idle' ? (
-            <motion.button 
-              style={{ ...styles.btnCapture, opacity: canCapture ? 1 : 0.3, cursor: canCapture ? 'pointer' : 'not-allowed' }} 
-              onClick={handleCapture}
-              whileHover={canCapture ? { scale: 1.02, backgroundColor: '#333' } : {}}
-              whileTap={canCapture ? { scale: 0.98 } : {}}
-            >{t('capture')}</motion.button>
+            <button style={styles.btnCapture} onClick={handleCapture}>捕捉</button>
           ) : (
             <>
-              <motion.button 
-                style={styles.btnContinue} 
-                onClick={handleContinue}
-                whileHover={{ scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' }}
-                whileTap={{ scale: 0.98 }}
-              >{t('continueHunt')}</motion.button>
-              <motion.button 
-                style={styles.btnFinish} 
-                onClick={handleFinish}
-                whileHover={{ scale: 1.02, backgroundColor: '#333' }}
-                whileTap={{ scale: 0.98 }}
-              >{t('finishWalk')}</motion.button>
+              <button style={styles.btnContinue} onClick={handleContinue}>继续捕猎</button>
+              <button style={styles.btnFinish} onClick={handleFinish}>完成漫步</button>
             </>
           )}
         </div>
@@ -395,18 +259,6 @@ const styles = {
     fontFamily: '"JetBrains Mono", monospace',
     fontSize: '0.85rem',
     color: '#1A1714',
-  },
-  iconBtn: {
-    background: 'rgba(245,240,232,0.85)',
-    border: 'none',
-    borderRadius: '50%',
-    width: 36,
-    height: 36,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    backdropFilter: 'blur(8px)',
   },
   archiveBtn: {
     background: 'rgba(245,240,232,0.85)',

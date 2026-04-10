@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react'
-import { motion } from 'motion/react'
+import { useState } from 'react'
 import { saveWalk } from '../utils/archive'
-import { downloadCard, shareCard } from '../utils/exportCard'
-import { playClick } from '../utils/audio'
-import { useLanguage } from '../contexts/LanguageContext'
+import { downloadCard } from '../utils/exportCard'
+
+const MODE_LABELS = { single: '单色', free: '多色' }
+const STRICT_LABELS = { ambient: '氛围漫游', hunter: '色彩猎人', precise: '精准采集' }
 
 function formatDisplay(isoString) {
   const d = new Date(isoString)
@@ -16,151 +16,87 @@ function luminance(r, g, b) {
 
 // ── 单色照片卡 ─────────────────────────────────────────────────────
 
-function SingleCard({ record, currentIdx, onIndexChange, t }) {
+function SingleCard({ record }) {
   const { themeGradient, collectedColors, matchScore, strictLevel, date } = record
-  const n = collectedColors.length
-  const scrollRef = useRef(null)
-  const scrollTimeout = useRef(null)
-
-  function handleScroll(e) {
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
-    scrollTimeout.current = setTimeout(() => {
-      const cardW = window.innerWidth * 0.8 + 16
-      const idx = Math.round(e.target.scrollLeft / cardW)
-      onIndexChange(Math.max(0, Math.min(idx, n - 1)))
-    }, 50)
-  }
-
-  if (n === 0) return null
+  const hit = collectedColors[0]
+  if (!hit) return null
+  const lum = luminance(hit.r, hit.g, hit.b)
+  const textOnHit = lum > 0.5 ? 'rgba(26,23,20,0.9)' : 'rgba(245,240,232,0.9)'
+  const subOnHit  = lum > 0.5 ? 'rgba(26,23,20,0.5)' : 'rgba(245,240,232,0.5)'
 
   return (
-    <div style={{ width: '100%' }}>
-      <div
-        ref={scrollRef}
-        className="no-scrollbar"
-        style={{
-          display: 'flex',
-          overflowX: 'scroll',
-          scrollSnapType: 'x mandatory',
-          WebkitOverflowScrolling: 'touch',
-          scrollBehavior: 'smooth',
-          overscrollBehaviorX: 'contain',
-          padding: '0 calc(10vw - 8px)',
-          paddingBottom: 4,
-        }}
-        onScroll={handleScroll}
-      >
-        {collectedColors.map((hit, i) => {
-          const lum = luminance(hit.r, hit.g, hit.b)
-          const textOnHit = lum > 0.5 ? 'rgba(26,23,20,0.9)' : 'rgba(245,240,232,0.9)'
-          const subOnHit  = lum > 0.5 ? 'rgba(26,23,20,0.5)' : 'rgba(245,240,232,0.5)'
-          
-          return (
-            <div key={i} style={{
-              scrollSnapAlign: 'center',
-              minWidth: '80vw',
-              margin: '0 8px',
-              flexShrink: 0,
-              transform: 'translateZ(0)',
-              ...card.root
-            }}>
-              <div style={card.photoArea}>
-                {hit.photoUrl
-                  ? <img src={hit.photoUrl} alt="" style={card.photo} />
-                  : <div style={{ ...card.photo, backgroundColor: hit.hex }} />
-                }
-                <div style={card.colorOverlay}>
-                  <div style={{ width: 36, height: 36, borderRadius: 7, backgroundColor: hit.hex, border: '1.5px solid rgba(255,255,255,0.3)', flexShrink: 0 }} />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <span style={{ ...card.overlayName, color: textOnHit }}>{hit.name}</span>
-                    <span style={{ ...card.overlayHex, color: subOnHit }}>{hit.hex.toUpperCase()}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={card.footer}>
-                <div style={{
-                  height: 10,
-                  background: `linear-gradient(to right, ${themeGradient.start.hex}, ${themeGradient.end.hex})`,
-                }} />
-                <div style={card.footerMeta}>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <span style={card.startDot}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: themeGradient.start.hex, display: 'inline-block', border: '1px solid rgba(26,23,20,0.12)' }} />
-                      <span style={card.gradientName}>{themeGradient.start.name}</span>
-                    </span>
-                    <span style={card.gradientArrow}>→</span>
-                    <span style={card.startDot}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: themeGradient.end.hex, display: 'inline-block', border: '1px solid rgba(26,23,20,0.12)' }} />
-                      <span style={card.gradientName}>{themeGradient.end.name}</span>
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                    {strictLevel === 'precise' && matchScore != null && (
-                      <span style={card.metaSmall}>{t('precise')} {matchScore}%</span>
-                    )}
-                    <span style={card.metaSmall}>{formatDisplay(date)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        })}
+    <div style={card.root}>
+      {/* 照片主体 */}
+      <div style={card.photoArea}>
+        {hit.photoUrl
+          ? <img src={hit.photoUrl} alt="" style={card.photo} />
+          : <div style={{ ...card.photo, backgroundColor: hit.hex }} />
+        }
+        {/* 色值叠加条 */}
+        <div style={card.colorOverlay}>
+          <div style={{ width: 36, height: 36, borderRadius: 7, backgroundColor: hit.hex, border: '1.5px solid rgba(255,255,255,0.3)', flexShrink: 0 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <span style={{ ...card.overlayName, color: textOnHit }}>{hit.name}</span>
+            <span style={{ ...card.overlayHex, color: subOnHit }}>{hit.hex.toUpperCase()}</span>
+          </div>
+        </div>
       </div>
 
-      {n > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, padding: '0.75rem 0 0.25rem' }}>
-          {collectedColors.map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width:  i === currentIdx ? 16 : 5,
-                height: 5,
-                borderRadius: 3,
-                backgroundColor: i === currentIdx ? '#1A1714' : 'rgba(26,23,20,0.22)',
-                transition: 'width 0.3s ease, background-color 0.3s ease',
-              }}
-            />
-          ))}
+      {/* 底部 footer */}
+      <div style={card.footer}>
+        <div style={{
+          height: 10,
+          background: `linear-gradient(to right, ${themeGradient.start.hex}, ${themeGradient.end.hex})`,
+        }} />
+        <div style={card.footerMeta}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <span style={card.startDot}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: themeGradient.start.hex, display: 'inline-block', border: '1px solid rgba(26,23,20,0.12)' }} />
+              <span style={card.gradientName}>{themeGradient.start.name}</span>
+            </span>
+            <span style={card.gradientArrow}>→</span>
+            <span style={card.startDot}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: themeGradient.end.hex, display: 'inline-block', border: '1px solid rgba(26,23,20,0.12)' }} />
+              <span style={card.gradientName}>{themeGradient.end.name}</span>
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+            {strictLevel === 'precise' && matchScore != null && (
+              <span style={card.metaSmall}>匹配度 {matchScore}%</span>
+            )}
+            <span style={card.metaSmall}>{formatDisplay(date)}</span>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
 // ── 自由模式：横向 Swiper ─────────────────────────────────────────
 
-function FreeCard({ record, currentIdx, onIndexChange, t }) {
+function FreeCard({ record }) {
   const photos = record?.collectedColors ?? []
   const { themeGradient, date } = record
+  const [currentIdx, setCurrentIdx] = useState(0)
   const n = photos.length
-  const scrollRef = useRef(null)
-  const scrollTimeout = useRef(null)
 
   function handleScroll(e) {
-    if (scrollTimeout.current) {
-      clearTimeout(scrollTimeout.current)
-    }
-    scrollTimeout.current = setTimeout(() => {
-      const cardW = window.innerWidth * 0.8 + 16
-      const idx = Math.round(e.target.scrollLeft / cardW)
-      onIndexChange(Math.max(0, Math.min(idx, n - 1)))
-    }, 50)
+    // 每张卡片 85vw + margin 左右各 8px = 85vw + 16px
+    const cardW = window.innerWidth * 0.85 + 16
+    const idx = Math.round(e.target.scrollLeft / cardW)
+    setCurrentIdx(Math.max(0, Math.min(idx, n - 1)))
   }
 
   return (
     <div style={{ width: '100%' }}>
+      {/* 外层容器：display flex, overflow-x scroll, scroll-snap-type x mandatory */}
       <div
-        ref={scrollRef}
         className="no-scrollbar"
         style={{
           display: 'flex',
           overflowX: 'scroll',
           scrollSnapType: 'x mandatory',
           WebkitOverflowScrolling: 'touch',
-          scrollBehavior: 'smooth',
-          overscrollBehaviorX: 'contain',
-          padding: '0 calc(10vw - 8px)',
           paddingBottom: 4,
         }}
         onScroll={handleScroll}
@@ -168,7 +104,7 @@ function FreeCard({ record, currentIdx, onIndexChange, t }) {
         {photos.length === 0 ? (
           <div style={{
             scrollSnapAlign: 'center',
-            minWidth: '80vw',
+            minWidth: '85vw',
             margin: '0 8px',
             borderRadius: 16,
             backgroundColor: '#EDE8DF',
@@ -179,15 +115,16 @@ function FreeCard({ record, currentIdx, onIndexChange, t }) {
             flexShrink: 0,
           }}>
             <span style={{ fontFamily: '"Noto Serif SC", Georgia, serif', fontSize: '0.85rem', color: '#9A8A7A' }}>
-              {t('noRecords')}
+              暂无采集
             </span>
           </div>
         ) : photos.map((c, i) => (
+          /* 每张卡片：scroll-snap-align center, min-width 85vw, margin 0 8px */
           <div
             key={i}
             style={{
               scrollSnapAlign: 'center',
-              minWidth: '80vw',
+              minWidth: '85vw',
               margin: '0 8px',
               flexShrink: 0,
               borderRadius: 16,
@@ -196,15 +133,16 @@ function FreeCard({ record, currentIdx, onIndexChange, t }) {
               backgroundColor: '#F5F0E8',
               display: 'flex',
               flexDirection: 'column',
-              transform: 'translateZ(0)',
             }}
           >
+            {/* 上方照片，object-fit cover */}
             <div style={{ height: '56vw', flexShrink: 0 }}>
               {c.photoUrl
                 ? <img src={c.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 : <div style={{ width: '100%', height: '100%', backgroundColor: c.hex }} />
               }
             </div>
+            {/* 下方色名 + HEX */}
             <div style={{ padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div style={{
                 width: 28, height: 28, borderRadius: 6,
@@ -225,6 +163,7 @@ function FreeCard({ record, currentIdx, onIndexChange, t }) {
         ))}
       </div>
 
+      {/* 底部圆点：photos.map 生成，当前页高亮 */}
       {n > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, padding: '0.75rem 0 0.25rem' }}>
           {photos.map((_, i) => (
@@ -242,10 +181,11 @@ function FreeCard({ record, currentIdx, onIndexChange, t }) {
         </div>
       )}
 
+      {/* 主题色带 + 日期 */}
       <div style={{ margin: '0.75rem 1.5rem 0' }}>
         <div style={{ height: 8, borderRadius: 4, background: `linear-gradient(to right, ${themeGradient.start.hex}, ${themeGradient.end.hex})` }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem' }}>
-          <span style={card.metaSmall}>{n} {t('colorsCount')}</span>
+          <span style={card.metaSmall}>{n} 个颜色</span>
           <span style={card.metaSmall}>{formatDisplay(date)}</span>
         </div>
       </div>
@@ -256,125 +196,73 @@ function FreeCard({ record, currentIdx, onIndexChange, t }) {
 // ── 主组件 ─────────────────────────────────────────────────────────
 
 export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, onBack }) {
-  const { t } = useLanguage()
+  console.log('EndPage收到的完整record:', JSON.stringify(record))
+  const photos = record?.collectedColors ?? []
+  console.log('收到的照片数据:', photos, '长度:', photos?.length)
+
   const [saved, setSaved] = useState(false)
   const [downloading, setDownloading] = useState(false)
-  const [sharing, setSharing] = useState(false)
-  const [currentIdx, setCurrentIdx] = useState(0)
-
-  const MODE_LABELS = { single: t('singleColor'), free: t('freeColor') }
-  const STRICT_LABELS = { ambient: t('ambient'), hunter: t('hunter'), precise: t('precise') }
 
   function handleSaveArchive() {
-    playClick();
     saveWalk(record)
     setSaved(true)
   }
 
   async function handleDownload() {
-    playClick();
     setDownloading(true)
-    await downloadCard(record, currentIdx)
+    await downloadCard(record)
     setDownloading(false)
   }
 
-  async function handleShare() {
-    playClick();
-    setSharing(true)
-    try {
-      const success = await shareCard(record, currentIdx)
-      if (!success) {
-        await downloadCard(record, currentIdx)
-      }
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setSharing(false)
-    }
-  }
-
   const scoreLabel = record.mode === 'single' && record.strictLevel === 'precise' && record.matchScore != null
-    ? record.matchScore >= 90 ? t('perfectMatch')
-      : record.matchScore >= 70 ? t('closeMatch')
-      : t('unexpectedColor')
+    ? record.matchScore >= 90 ? '完美命中'
+      : record.matchScore >= 70 ? '色相相近'
+      : '意外之色'
     : null
 
   return (
     <div className="page-enter" style={styles.root}>
+      {/* 顶部导航 */}
       <div style={styles.topNav}>
         {readonly
-          ? <motion.button 
-              style={styles.navBtn} 
-              onClick={() => { onBack(); playClick(); }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >← {t('back')}</motion.button>
+          ? <button style={styles.navBtn} onClick={onBack}>← 返回</button>
           : <div />
         }
         <div style={styles.tags}>
+          <span style={styles.tag}>{MODE_LABELS[record.mode]}</span>
           <span style={styles.tag}>{STRICT_LABELS[record.strictLevel]}</span>
         </div>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingBottom: readonly ? '2rem' : 0 }}>
-        {record.mode === 'single' 
-          ? <SingleCard record={record} currentIdx={currentIdx} onIndexChange={setCurrentIdx} t={t} /> 
-          : <FreeCard record={record} currentIdx={currentIdx} onIndexChange={setCurrentIdx} t={t} />
-        }
+      {/* 色卡：两种模式都用滑动卡片 */}
+      <FreeCard record={record} />
 
-        {scoreLabel && <p style={styles.scoreLabel}>{scoreLabel}</p>}
-      </div>
+      {scoreLabel && <p style={styles.scoreLabel}>{scoreLabel}</p>}
 
+      {/* 操作按钮 */}
       {!readonly && (
         <div style={styles.actions}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <motion.button 
-              style={{ ...styles.btnSecondary, flex: 1 }} 
-              onClick={handleDownload} 
-              disabled={downloading}
-              whileHover={{ scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' }}
-              whileTap={{ scale: 0.98 }}
-            >
-              {downloading ? '...' : t('downloadCard')}
-            </motion.button>
-            <motion.button 
-              style={{ ...styles.btnSecondary, flex: 1 }} 
-              onClick={handleShare} 
-              disabled={sharing}
-              whileHover={{ scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' }}
-              whileTap={{ scale: 0.98 }}
-            >
-              {sharing ? '...' : t('share')}
-            </motion.button>
-          </div>
-          <motion.button
+          <button style={styles.btnSecondary} onClick={handleDownload} disabled={downloading}>
+            {downloading ? '生成中…' : '保存到相册'}
+          </button>
+          <button
             style={saved ? styles.btnSaved : styles.btnSecondary}
             onClick={handleSaveArchive}
             disabled={saved}
-            whileHover={!saved ? { scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' } : {}}
-            whileTap={!saved ? { scale: 0.98 } : {}}
           >
-            {saved ? t('saved') : t('saveArchive')}
-          </motion.button>
-          <motion.button 
-            style={styles.btnPrimary} 
-            onClick={() => { onWalkAgain(); playClick(); }}
-            whileHover={{ scale: 1.02, backgroundColor: '#333' }}
-            whileTap={{ scale: 0.98 }}
-          >{t('walkAgain')}</motion.button>
+            {saved ? '已存入档案' : '存入档案'}
+          </button>
+          <button style={styles.btnPrimary} onClick={onWalkAgain}>再走一次</button>
           {saved && (
-            <motion.button 
-              style={styles.btnViewArchive} 
-              onClick={() => { onViewArchive(); playClick(); }}
-              whileHover={{ scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' }}
-              whileTap={{ scale: 0.98 }}
-            >{t('viewArchive')}</motion.button>
+            <button style={styles.btnViewArchive} onClick={onViewArchive}>查看档案</button>
           )}
         </div>
       )}
     </div>
   )
 }
+
+// ── 色卡局部样式 ───────────────────────────────────────────────────
 
 const card = {
   root: {
@@ -454,6 +342,8 @@ const card = {
     display: 'block',
   },
 }
+
+// ── 页面样式 ───────────────────────────────────────────────────────
 
 const styles = {
   root: {

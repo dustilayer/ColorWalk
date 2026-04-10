@@ -1,0 +1,5 @@
+{
+  "name": "Color Walk",
+  "description": "A color capturing and theme generation app.",
+  "requestFramePermissions": ["camera"]
+}

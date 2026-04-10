@@ -1,32 +1,36 @@
 import { useState } from 'react'
-import { motion } from 'motion/react'
-import { playClick } from '../utils/audio'
-import { useLanguage } from '../contexts/LanguageContext'
+
+const MODES = [
+  { id: 'single', title: '传统 Color Walk', desc: '整次漫步只锁定一个颜色，选择即决定' },
+  { id: 'free',   title: '自由采集',        desc: '随心收集，无数量限制，结束生成调色盘' },
+]
+
+const LEVELS = [
+  { id: 'ambient', title: '氛围漫游', desc: '主题色只是氛围参考，无任何匹配提示' },
+  { id: 'hunter',  title: '色彩猎人', desc: '显示色相接近度指示，感受而不强制' },
+  { id: 'precise', title: '精准采集', desc: '实时匹配度百分比，≥80% 准星高亮' },
+]
 
 // 通用选项卡片：position:relative + absolute accent 竖线
 function OptionCard({ selected, onClick, title, desc, large }) {
   return (
-    <motion.button
+    <button
       style={{
         position: 'relative',
         overflow: 'hidden',
         width: '100%',
         textAlign: 'left',
-        border: `1px solid var(--card-border, rgba(26,23,20,0.1))`,
+        border: `1px solid rgba(26,23,20,${selected ? '0.2' : '0.1'})`,
         borderRadius: large ? 14 : 11,
-        backgroundColor: selected ? 'var(--card-border, rgba(26,23,20,0.07))' : 'var(--card-bg, rgba(255,255,255,0.55))',
+        backgroundColor: selected ? 'rgba(26,23,20,0.07)' : 'rgba(255,255,255,0.55)',
         padding: large ? '1.1rem 1.1rem 1.1rem 1.3rem' : '0.8rem 1rem 0.8rem 1.2rem',
         cursor: 'pointer',
         display: 'flex',
         flexDirection: 'column',
         gap: large ? '0.45rem' : '0.28rem',
-        transition: 'background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-        boxShadow: selected ? '0 0 0 2px rgba(26,23,20,0.1), 0 4px 12px rgba(26,23,20,0.05)' : 'none',
+        transition: 'background-color 0.2s ease-in-out, border-color 0.2s ease-in-out',
       }}
-      onClick={() => { onClick(); playClick(); }}
-      whileHover={{ scale: 1.02, backgroundColor: selected ? 'rgba(26,23,20,0.07)' : 'rgba(255,255,255,0.8)' }}
-      whileTap={{ scale: 0.98 }}
-      whileFocus={{ scale: 1.02, boxShadow: '0 0 0 2px rgba(26,23,20,0.2)' }}
+      onClick={onClick}
     >
       {/* 左侧 3px 竖线（选中时才渲染） */}
       {selected && (
@@ -42,7 +46,7 @@ function OptionCard({ selected, onClick, title, desc, large }) {
       <span style={{
         fontFamily: '"Noto Serif SC", Georgia, serif',
         fontSize: large ? '1rem' : '0.875rem',
-        color: 'var(--text-color, #1A1714)',
+        color: '#1A1714',
         letterSpacing: '0.04em',
         display: 'block',
       }}>
@@ -51,13 +55,13 @@ function OptionCard({ selected, onClick, title, desc, large }) {
       <span style={{
         fontFamily: 'system-ui, sans-serif',
         fontSize: large ? '0.8rem' : '0.75rem',
-        color: 'var(--text-muted, #7A6A5A)',
+        color: '#7A6A5A',
         lineHeight: 1.6,
         display: 'block',
       }}>
         {desc}
       </span>
-    </motion.button>
+    </button>
   )
 }
 
@@ -79,33 +83,39 @@ function SectionLabel({ children }) {
 }
 
 export default function SettingsPage({ onNext, onBack }) {
-  const { t } = useLanguage()
+  const [mode,  setMode]  = useState('single')
   const [level, setLevel] = useState('ambient')
-
-  const LEVELS = [
-    { id: 'ambient', title: t('ambient'), desc: t('ambientDesc') },
-    { id: 'hunter',  title: t('hunter'),  desc: t('hunterDesc') },
-    { id: 'precise', title: t('precise'), desc: t('preciseDesc') },
-  ]
 
   return (
     <div className="page-enter" style={styles.root}>
 
       {/* 顶部 */}
       <div style={styles.header}>
-        <motion.button 
-          style={styles.backBtn} 
-          onClick={() => { onBack(); playClick(); }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >← {t('back')}</motion.button>
-        <h1 style={styles.title}>{t('departureSettings')}</h1>
-        <p style={styles.subtitle}>{t('independentSettings')}</p>
+        <button style={styles.backBtn} onClick={onBack}>← 返回</button>
+        <h1 style={styles.title}>出发设定</h1>
+        <p style={styles.subtitle}>每次漫步前独立设置</p>
+      </div>
+
+      {/* 采集方式 */}
+      <div style={styles.section}>
+        <SectionLabel>采集方式</SectionLabel>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+          {MODES.map(m => (
+            <OptionCard
+              key={m.id}
+              selected={mode === m.id}
+              onClick={() => setMode(m.id)}
+              title={m.title}
+              desc={m.desc}
+              large
+            />
+          ))}
+        </div>
       </div>
 
       {/* 漫游节奏 */}
       <div style={styles.section}>
-        <SectionLabel>{t('pacing')}</SectionLabel>
+        <SectionLabel>漫游节奏</SectionLabel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {LEVELS.map(lv => (
             <OptionCard
@@ -124,14 +134,9 @@ export default function SettingsPage({ onNext, onBack }) {
 
       {/* 底部按钮 */}
       <div style={styles.bottomArea}>
-        <motion.button 
-          style={styles.btnStart} 
-          onClick={() => { onNext('free', level); playClick(); }}
-          whileHover={{ scale: 1.02, backgroundColor: '#fff' }}
-          whileTap={{ scale: 0.98 }}
-        >
-          {t('startWalk')}
-        </motion.button>
+        <button style={styles.btnStart} onClick={() => onNext(mode, level)}>
+          开始漫步
+        </button>
       </div>
     </div>
   )
@@ -140,12 +145,11 @@ export default function SettingsPage({ onNext, onBack }) {
 const styles = {
   root: {
     minHeight: '100dvh',
-    backgroundColor: 'var(--bg-color, #F5F0E8)',
+    backgroundColor: '#F5F0E8',
     display: 'flex',
     flexDirection: 'column',
     padding: '0 1.5rem',
     boxSizing: 'border-box',
-    transition: 'background-color 0.3s ease',
   },
   header: {
     paddingTop: '3rem',
@@ -155,18 +159,18 @@ const styles = {
     background: 'none', border: 'none', padding: 0,
     marginBottom: '1.25rem', display: 'block',
     fontFamily: '"Noto Serif SC", Georgia, serif',
-    fontSize: '0.85rem', color: 'var(--text-muted, #7A6A5A)',
+    fontSize: '0.85rem', color: '#7A6A5A',
     cursor: 'pointer', letterSpacing: '0.05em',
   },
   title: {
     fontFamily: '"Noto Serif SC", Georgia, serif',
     fontSize: '2rem', fontWeight: 400,
-    color: 'var(--text-color, #1A1714)', margin: '0 0 0.3rem',
+    color: '#1A1714', margin: '0 0 0.3rem',
     letterSpacing: '0.05em',
   },
   subtitle: {
     fontFamily: '"Noto Serif SC", Georgia, serif',
-    fontSize: '0.82rem', color: 'var(--text-muted, #9A8A7A)',
+    fontSize: '0.82rem', color: '#9A8A7A',
     margin: 0, letterSpacing: '0.08em',
   },
   section: {
@@ -178,9 +182,9 @@ const styles = {
   },
   btnStart: {
     width: '100%',
-    backgroundColor: 'var(--card-bg, rgba(255,255,255,0.88))',
-    color: 'var(--text-color, #1A1714)',
-    border: '1px solid var(--card-border, rgba(26,23,20,0.15))',
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    color: '#1A1714',
+    border: '1px solid rgba(26,23,20,0.15)',
     borderRadius: 16, padding: '1rem',
     fontFamily: '"Noto Serif SC", Georgia, serif',
     fontSize: '1rem', letterSpacing: '0.1em',
