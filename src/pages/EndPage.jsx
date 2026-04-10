@@ -1,9 +1,11 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion } from 'motion/react'
-import { saveWalk } from '../utils/archive'
+import { Star } from 'lucide-react'
+import { saveWalk, getWalks } from '../utils/archive'
 import { downloadCard, shareCard } from '../utils/exportCard'
-import { playClick } from '../utils/audio'
 import { useLanguage } from '../contexts/LanguageContext'
+import { checkAchievements } from '../utils/achievementUtils'
+import AchievementToast from '../components/AchievementToast'
 
 function formatDisplay(isoString) {
   const d = new Date(isoString)
@@ -66,10 +68,27 @@ function SingleCard({ record, currentIdx, onIndexChange, t }) {
             }}>
               <div style={card.photoArea}>
                 {hit.photoUrl
-                  ? <img src={hit.photoUrl} alt="" style={card.photo} />
-                  : <div style={{ ...card.photo, backgroundColor: hit.hex }} />
+                  ? <img src={hit.photoUrl} alt="" style={card.photoAbsolute} />
+                  : <div style={{ ...card.photoAbsolute, backgroundColor: hit.hex }} />
                 }
                 <div style={card.colorOverlay}>
+                  {hit.isPerfect && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 12,
+                      right: 12,
+                      backgroundColor: 'rgba(255,215,0,0.9)',
+                      padding: '4px 8px',
+                      borderRadius: 12,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                      zIndex: 5,
+                    }}>
+                      <Star size={12} fill="#1A1714" color="#1A1714" />
+                    </div>
+                  )}
                   <div style={{ width: 36, height: 36, borderRadius: 7, backgroundColor: hit.hex, border: '1.5px solid rgba(255,255,255,0.3)', flexShrink: 0 }} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <span style={{ ...card.overlayName, color: textOnHit }}>{hit.name}</span>
@@ -199,10 +218,27 @@ function FreeCard({ record, currentIdx, onIndexChange, t }) {
               transform: 'translateZ(0)',
             }}
           >
-            <div style={{ height: '56vw', flexShrink: 0 }}>
+            <div style={{ height: '56vw', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+              {c.isPerfect && (
+                <div style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 12,
+                  backgroundColor: 'rgba(255,215,0,0.9)',
+                  padding: '4px 8px',
+                  borderRadius: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                  zIndex: 5,
+                }}>
+                  <Star size={12} fill="#1A1714" color="#1A1714" />
+                </div>
+              )}
               {c.photoUrl
-                ? <img src={c.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                : <div style={{ width: '100%', height: '100%', backgroundColor: c.hex }} />
+                ? <img src={c.photoUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                : <div style={{ position: 'absolute', inset: 0, backgroundColor: c.hex }} />
               }
             </div>
             <div style={{ padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -261,25 +297,30 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
   const [downloading, setDownloading] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [currentIdx, setCurrentIdx] = useState(0)
+  const [newAchievements, setNewAchievements] = useState([])
+
+  useEffect(() => {
+    if (readonly) return
+    const allRecords = [record, ...getWalks()]
+    const unlocked = checkAchievements(record, allRecords)
+    if (unlocked.length > 0) setNewAchievements(unlocked)
+  }, [])
 
   const MODE_LABELS = { single: t('singleColor'), free: t('freeColor') }
   const STRICT_LABELS = { ambient: t('ambient'), hunter: t('hunter'), precise: t('precise') }
 
   function handleSaveArchive() {
-    playClick();
     saveWalk(record)
     setSaved(true)
   }
 
   async function handleDownload() {
-    playClick();
     setDownloading(true)
     await downloadCard(record, currentIdx)
     setDownloading(false)
   }
 
   async function handleShare() {
-    playClick();
     setSharing(true)
     try {
       const success = await shareCard(record, currentIdx)
@@ -301,11 +342,15 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
 
   return (
     <div className="page-enter" style={styles.root}>
+      <AchievementToast
+        newAchievements={newAchievements}
+        themeColor={record.themeGradient?.start?.hex}
+      />
       <div style={styles.topNav}>
         {readonly
           ? <motion.button 
               style={styles.navBtn} 
-              onClick={() => { onBack(); playClick(); }}
+              onClick={() => { onBack(); }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >← {t('back')}</motion.button>
@@ -358,14 +403,14 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
           </motion.button>
           <motion.button 
             style={styles.btnPrimary} 
-            onClick={() => { onWalkAgain(); playClick(); }}
+            onClick={() => { onWalkAgain(); }}
             whileHover={{ scale: 1.02, backgroundColor: '#333' }}
             whileTap={{ scale: 0.98 }}
           >{t('walkAgain')}</motion.button>
           {saved && (
             <motion.button 
               style={styles.btnViewArchive} 
-              onClick={() => { onViewArchive(); playClick(); }}
+              onClick={() => { onViewArchive(); }}
               whileHover={{ scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' }}
               whileTap={{ scale: 0.98 }}
             >{t('viewArchive')}</motion.button>
@@ -393,6 +438,14 @@ const card = {
     flexShrink: 0,
   },
   photo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    display: 'block',
+  },
+  photoAbsolute: {
+    position: 'absolute',
+    inset: 0,
     width: '100%',
     height: '100%',
     objectFit: 'cover',

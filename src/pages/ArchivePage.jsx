@@ -1,10 +1,9 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'motion/react'
-import { getWalks } from '../utils/archive'
+import { getWalks, deleteWalk } from '../utils/archive'
 import { useLanguage } from '../contexts/LanguageContext'
 import EndPage from './EndPage'
-import { playClick } from '../utils/audio'
-import { Calendar, Palette } from 'lucide-react'
+import { Calendar, Palette, Star, Trophy } from 'lucide-react'
 import { hexToRgb } from '../utils/colorUtils'
 
 function getHue(hex) {
@@ -35,82 +34,74 @@ function formatDate(isoString) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`
 }
 
-function PhotoStack({ photos, colors }) {
-  const displayPhotos = photos.slice(0, 4)
-  const remaining = photos.length - 4
+// 始终渲染 3 层堆叠，统一卡片感
+// photos: c.photoUrl 数组（含 null），colors: collectedColors，themeGradient: 渐变兜底色
+function PhotoStack({ photos, colors, themeGradient }) {
+  const LAYERS = 3
+  const center = (LAYERS - 1) / 2  // = 1
 
   return (
-    <div style={{ position: 'relative', width: 140, height: 100, flexShrink: 0, marginRight: '1rem' }}>
-      {displayPhotos.map((p, i) => (
-        <motion.div
-          key={i}
-          style={{
-            position: 'absolute',
-            width: 70,
-            height: 90,
-            borderRadius: 8,
-            overflow: 'hidden',
-            backgroundColor: colors[i]?.hex || '#eee',
-            border: '1.5px solid white',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            left: i * 18,
-            top: i % 2 === 0 ? 0 : 8,
-            rotate: (i - 1.5) * 8,
-            zIndex: 10 - i,
-          }}
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: i * 0.1 }}
-        >
-          {p ? (
-            <img src={p} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : null}
-          {i === 3 && remaining > 0 && (
-            <div style={{
+    <div style={{ position: 'relative', width: 120, height: 98, flexShrink: 0, marginRight: '1rem' }}>
+      {Array.from({ length: LAYERS }, (_, i) => {
+        const isTop  = i === LAYERS - 1
+        const photo  = photos[i] ?? null
+        const bgColor = colors[i]?.hex ?? themeGradient.start.hex
+        const rotate  = (i - center) * 7          // bottom:-7°  mid:0°  top:+7°
+        const opacity = isTop ? 1 : 0.42 + i * 0.12
+        const scale   = isTop ? 1 : 0.88 + i * 0.04
+
+        return (
+          <motion.div
+            key={i}
+            style={{
               position: 'absolute',
-              inset: 0,
-              backgroundColor: 'rgba(0,0,0,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontFamily: '"JetBrains Mono", monospace',
-              fontSize: '0.9rem',
-              fontWeight: 'bold',
-            }}>
-              +{remaining}
-            </div>
-          )}
-        </motion.div>
-      ))}
-      {photos.length === 0 && colors.length > 0 && (
-        <div style={{
-          position: 'absolute',
-          width: 70,
-          height: 90,
-          borderRadius: 8,
-          backgroundColor: colors[0].hex,
-          border: '1.5px solid white',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          left: 35,
-          top: 5,
-        }} />
-      )}
+              width: 66,
+              height: 84,
+              borderRadius: 8,
+              overflow: 'hidden',
+              backgroundColor: bgColor,
+              border: `1.5px solid ${isTop ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.65)'}`,
+              boxShadow: isTop
+                ? '0 6px 18px rgba(0,0,0,0.22)'
+                : '0 2px 6px rgba(0,0,0,0.12)',
+              left: i * 17,
+              top:  i % 2 === 0 ? 4 : 10,
+              rotate,
+              zIndex: i,
+              filter: isTop ? 'none' : 'blur(2px) brightness(0.82) saturate(0.72)',
+              opacity,
+              scale,
+            }}
+            initial={{ opacity: 0, scale: 0.55 }}
+            animate={{ opacity, scale }}
+            transition={{ duration: 0.38, delay: i * 0.06 }}
+          >
+            {photo && (
+              <img
+                src={photo}
+                alt=""
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            )}
+          </motion.div>
+        )
+      })}
     </div>
   )
 }
 
-function WalkCard({ record, onClick, t, MODE_LABELS, STRICT_LABELS }) {
-  const { themeGradient, collectedColors, mode, strictLevel, date } = record
-  const photos = collectedColors.map(c => c.photoUrl).filter(Boolean)
+function WalkCard({ record, onClick, onDelete, t, MODE_LABELS, STRICT_LABELS }) {
+  const { themeGradient, collectedColors, strictLevel, date } = record
+  // Keep nulls so PhotoStack can fill empty slots with color blocks
+  const photos = collectedColors.map(c => c.photoUrl ?? null)
+  const [confirming, setConfirming] = useState(false)
 
   return (
-    <motion.button 
-      style={styles.card} 
-      onClick={() => { onClick(); playClick(); }}
+    <motion.div
+      style={{ ...styles.card, cursor: 'pointer' }}
+      onClick={() => { if (!confirming) { onClick() } }}
       whileHover={{ scale: 1.02, y: -2, boxShadow: '0 8px 24px rgba(26,23,20,0.1)' }}
       whileTap={{ scale: 0.98 }}
-      whileFocus={{ scale: 1.02, boxShadow: '0 0 0 2px rgba(26,23,20,0.2)' }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
@@ -123,23 +114,50 @@ function WalkCard({ record, onClick, t, MODE_LABELS, STRICT_LABELS }) {
       }} />
 
       <div style={styles.cardContent}>
-        <PhotoStack photos={photos} colors={collectedColors} />
-        
+        <PhotoStack photos={photos} colors={collectedColors} themeGradient={themeGradient} />
+
         <div style={styles.meta}>
           <span style={styles.metaDate}>{formatDate(date)}</span>
           <div style={styles.metaTags}>
             <span style={styles.tag}>{STRICT_LABELS[strictLevel]}</span>
+            {(record.collectedColors || record.colors || []).some(c => c.isPerfect) && (
+              <span style={{ ...styles.tag, borderColor: '#FFD700', color: '#B8860B', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Star size={10} fill="#FFD700" color="#FFD700" />
+                {t('perfectPhotos')}
+              </span>
+            )}
           </div>
           {collectedColors.length > 0 && (
             <span style={styles.metaCount}>{collectedColors.length} {t('colorsCount')}</span>
           )}
+
+          {onDelete && (
+            confirming ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
+                <span style={styles.deleteHint}>确认删除这条记录？</span>
+                <button
+                  style={styles.confirmBtn}
+                  onClick={e => { e.stopPropagation(); onDelete(record.id) }}
+                >确认</button>
+                <button
+                  style={styles.cancelBtn}
+                  onClick={e => { e.stopPropagation(); setConfirming(false) }}
+                >取消</button>
+              </div>
+            ) : (
+              <button
+                style={styles.deleteBtn}
+                onClick={e => { e.stopPropagation(); setConfirming(true) }}
+              >删除</button>
+            )
+          )}
         </div>
       </div>
-    </motion.button>
+    </motion.div>
   )
 }
 
-function ColorStack({ bucket, walks, onSelectWalk, t, MODE_LABELS, STRICT_LABELS }) {
+function ColorStack({ bucket, walks, onSelectWalk, onDelete, t, MODE_LABELS, STRICT_LABELS }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -152,7 +170,7 @@ function ColorStack({ bucket, walks, onSelectWalk, t, MODE_LABELS, STRICT_LABELS
           marginBottom: '0.75rem',
           cursor: 'pointer',
         }}
-        onClick={() => { setExpanded(!expanded); playClick(); }}
+        onClick={() => { setExpanded(!expanded); }}
         whileTap={{ scale: 0.98 }}
       >
         <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: bucket.color }} />
@@ -164,7 +182,7 @@ function ColorStack({ bucket, walks, onSelectWalk, t, MODE_LABELS, STRICT_LABELS
       {!expanded ? (
         <div 
           style={{ position: 'relative', height: 130, cursor: 'pointer' }}
-          onClick={() => { setExpanded(true); playClick(); }}
+          onClick={() => { setExpanded(true); }}
         >
           {walks.slice(0, 3).map((record, idx) => (
             <motion.div
@@ -191,7 +209,7 @@ function ColorStack({ bucket, walks, onSelectWalk, t, MODE_LABELS, STRICT_LABELS
           style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}
         >
           {walks.map((record) => (
-            <WalkCard key={record.id} record={record} onClick={() => onSelectWalk(record)} t={t} MODE_LABELS={MODE_LABELS} STRICT_LABELS={STRICT_LABELS} />
+            <WalkCard key={record.id} record={record} onClick={() => onSelectWalk(record)} onDelete={onDelete} t={t} MODE_LABELS={MODE_LABELS} STRICT_LABELS={STRICT_LABELS} />
           ))}
         </motion.div>
       )}
@@ -199,11 +217,16 @@ function ColorStack({ bucket, walks, onSelectWalk, t, MODE_LABELS, STRICT_LABELS
   )
 }
 
-export default function ArchivePage({ onStartWalk }) {
+export default function ArchivePage({ onStartWalk, onAchievements }) {
   const { t } = useLanguage()
-  const [walks] = useState(() => getWalks())
+  const [walks, setWalks] = useState(() => getWalks())
+
+  function handleDelete(id) {
+    deleteWalk(id)
+    setWalks(prev => prev.filter(w => w.id !== id))
+  }
   const [detail, setDetail] = useState(null)
-  const [sortMode, setSortMode] = useState('date') // 'date' | 'color'
+  const [sortMode, setSortMode] = useState('date') // 'date' | 'color' | 'perfect'
 
   const MODE_LABELS = { single: t('singleColor'), free: t('freeColor') }
   const STRICT_LABELS = { ambient: t('ambient'), hunter: t('hunter'), precise: t('precise') }
@@ -233,8 +256,21 @@ export default function ArchivePage({ onStartWalk }) {
     return Object.values(groups).sort((a, b) => b.walks.length - a.walks.length)
   }, [walks, sortMode, t])
 
+  const perfectPhotos = useMemo(() => {
+    const photos = []
+    walks.forEach(w => {
+      const colors = w.collectedColors || w.colors || []
+      colors.forEach(c => {
+        if (c.isPerfect) {
+          photos.push({ ...c, walkId: w.id, date: w.date })
+        }
+      })
+    })
+    return photos.sort((a, b) => new Date(b.date) - new Date(a.date))
+  }, [walks])
+
   if (detail) {
-    return <EndPage record={detail} readonly onBack={() => { setDetail(null); playClick(); }} />
+    return <EndPage record={detail} readonly onBack={() => { setDetail(null); }} />
   }
 
   return (
@@ -243,9 +279,21 @@ export default function ArchivePage({ onStartWalk }) {
         <h1 style={styles.title}>{t('archive')}</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={styles.sortToggle}>
+            {onAchievements && (
+              <motion.button
+                style={{ ...styles.sortBtn, opacity: 0.7 }}
+                onClick={() => { onAchievements(); }}
+                whileHover={{ scale: 1.1, opacity: 1 }}
+                whileTap={{ scale: 0.9 }}
+                title={t('achievements')}
+              >
+                <Trophy size={18} color="var(--text-color, #1A1714)" />
+              </motion.button>
+            )}
+            <div style={{ width: 1, height: 14, backgroundColor: 'rgba(26,23,20,0.15)', margin: '0 2px' }} />
             <motion.button
               style={{ ...styles.sortBtn, opacity: sortMode === 'date' ? 1 : 0.4 }}
-              onClick={() => { setSortMode('date'); playClick(); }}
+              onClick={() => { setSortMode('date'); }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
             >
@@ -253,16 +301,24 @@ export default function ArchivePage({ onStartWalk }) {
             </motion.button>
             <motion.button
               style={{ ...styles.sortBtn, opacity: sortMode === 'color' ? 1 : 0.4 }}
-              onClick={() => { setSortMode('color'); playClick(); }}
+              onClick={() => { setSortMode('color'); }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
             >
               <Palette size={18} color="#1A1714" />
             </motion.button>
+            <motion.button
+              style={{ ...styles.sortBtn, opacity: sortMode === 'perfect' ? 1 : 0.4 }}
+              onClick={() => { setSortMode('perfect'); }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+            >
+              <Star size={18} color={sortMode === 'perfect' ? '#FFD700' : '#1A1714'} fill={sortMode === 'perfect' ? '#FFD700' : 'none'} />
+            </motion.button>
           </div>
           <motion.button 
             style={styles.startBtn} 
-            onClick={() => { onStartWalk(); playClick(); }}
+            onClick={() => { onStartWalk(); }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >{t('goCapture')}</motion.button>
@@ -277,22 +333,50 @@ export default function ArchivePage({ onStartWalk }) {
       ) : sortMode === 'date' ? (
         <div style={styles.list}>
           {sortedWalks.map((record) => (
-            <WalkCard key={record.id} record={record} onClick={() => setDetail(record)} t={t} MODE_LABELS={MODE_LABELS} STRICT_LABELS={STRICT_LABELS} />
+            <WalkCard key={record.id} record={record} onClick={() => setDetail(record)} onDelete={handleDelete} t={t} MODE_LABELS={MODE_LABELS} STRICT_LABELS={STRICT_LABELS} />
           ))}
         </div>
-      ) : (
+      ) : sortMode === 'color' ? (
         <div style={styles.list}>
           {groupedWalks.map(group => (
-            <ColorStack 
-              key={group.bucket.id} 
-              bucket={group.bucket} 
-              walks={group.walks} 
-              onSelectWalk={setDetail} 
+            <ColorStack
+              key={group.bucket.id}
+              bucket={group.bucket}
+              walks={group.walks}
+              onSelectWalk={setDetail}
+              onDelete={handleDelete}
               t={t}
               MODE_LABELS={MODE_LABELS}
               STRICT_LABELS={STRICT_LABELS}
             />
           ))}
+        </div>
+      ) : (
+        <div style={styles.perfectGrid}>
+          {perfectPhotos.map((photo, i) => (
+            <motion.div 
+              key={i} 
+              style={styles.perfectItem}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.05 }}
+              onClick={() => {
+                const walk = walks.find(w => w.id === photo.walkId)
+                if (walk) setDetail(walk)
+              }}
+            >
+              <img src={photo.photoUrl} alt="" style={styles.perfectImg} />
+              <div style={styles.perfectOverlay}>
+                <Star size={12} fill="#FFD700" color="#FFD700" />
+                <span style={styles.perfectName}>{photo.name}</span>
+              </div>
+            </motion.div>
+          ))}
+          {perfectPhotos.length === 0 && (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', paddingTop: '4rem', opacity: 0.5 }}>
+              <p style={{ fontFamily: '"Noto Serif SC", serif', fontSize: '0.9rem' }}>还没有完美拍摄的照片</p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -350,6 +434,42 @@ const styles = {
     justifyContent: 'center',
     borderRadius: '50%',
     color: 'var(--text-color, #1A1714)',
+  },
+  perfectGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: '0.5rem',
+    padding: '0 1.5rem 2rem',
+  },
+  perfectItem: {
+    position: 'relative',
+    aspectRatio: '3/4',
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#eee',
+    cursor: 'pointer',
+  },
+  perfectImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  perfectOverlay: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    padding: '0.4rem',
+    background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.25rem',
+  },
+  perfectName: {
+    color: 'white',
+    fontSize: '0.6rem',
+    fontFamily: '"Noto Serif SC", serif',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   },
   list: {
     display: 'flex',
@@ -427,6 +547,47 @@ const styles = {
     fontSize: '0.72rem',
     color: 'var(--text-muted, #9A8A7A)',
     letterSpacing: '0.04em',
+  },
+  deleteBtn: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    fontFamily: '"Noto Serif SC", Georgia, serif',
+    fontSize: '0.68rem',
+    color: 'rgba(26,23,20,0.28)',
+    cursor: 'pointer',
+    letterSpacing: '0.04em',
+    marginTop: '0.2rem',
+    alignSelf: 'flex-start',
+  },
+  deleteHint: {
+    fontFamily: '"Noto Serif SC", Georgia, serif',
+    fontSize: '0.66rem',
+    color: 'rgba(26,23,20,0.38)',
+    letterSpacing: '0.02em',
+    whiteSpace: 'nowrap',
+  },
+  confirmBtn: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    fontFamily: '"Noto Serif SC", Georgia, serif',
+    fontSize: '0.68rem',
+    color: 'rgba(26,23,20,0.55)',
+    cursor: 'pointer',
+    letterSpacing: '0.04em',
+    flexShrink: 0,
+  },
+  cancelBtn: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    fontFamily: '"Noto Serif SC", Georgia, serif',
+    fontSize: '0.68rem',
+    color: 'rgba(26,23,20,0.28)',
+    cursor: 'pointer',
+    letterSpacing: '0.04em',
+    flexShrink: 0,
   },
   empty: {
     flex: 1,

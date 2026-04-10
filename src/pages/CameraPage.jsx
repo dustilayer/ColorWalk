@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'motion/react'
 import { findNearestColor, rgbToHex, computeMatchScore } from '../utils/colorUtils'
-import { playClick, playChime, playCaptureSound } from '../utils/audio'
+import { playClick, playChime, playCaptureSound, playPerfectCaptureSound } from '../utils/audio'
 import { SwitchCamera, Undo2, Redo2 } from 'lucide-react'
 import { useLanguage } from '../contexts/LanguageContext'
 
@@ -48,7 +48,6 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
   }, [facingMode, t])
 
   const toggleCamera = () => {
-    playClick()
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment')
   }
 
@@ -95,7 +94,7 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
   // 截取当前帧（缩放至 480px 宽，控制体积）
   function captureFrame() {
     const video = videoRef.current
-    if (!video || video.readyState < 2) return null
+    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null
     const W = 480
     const H = Math.round(video.videoHeight * (W / video.videoWidth))
     const cap = document.createElement('canvas')
@@ -112,9 +111,14 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
   function handleCapture() {
     const matchScore = computeMatchScore({ r: smoothRef.current.r, g: smoothRef.current.g, b: smoothRef.current.b }, themeGradient)
     const threshold = strictLevel === 'ambient' ? 40 : strictLevel === 'hunter' ? 80 : 100
-    if (matchScore < threshold) return;
+    const isPerfect = matchScore >= threshold;
 
-    playCaptureSound();
+    if (isPerfect) {
+      playPerfectCaptureSound();
+    } else {
+      playCaptureSound();
+    }
+
     setFlash(true);
     setTimeout(() => setFlash(false), 300);
     
@@ -125,17 +129,16 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
       name: findNearestColor(s.r, s.g, s.b),
     }
     const photoUrl = captureFrame()
-    const entry = { ...color, photoUrl }
+    const entry = { ...color, photoUrl, isPerfect }
 
     setLastCapture(entry)
-    setCollectedColors((prev) => [...prev, entry]) // 始终追加，继续捕猎不会丢失旧照片
-    setRedoStack([]) // 清空重做栈
+    setCollectedColors((prev) => [...prev, entry])
+    setRedoStack([])
     setCaptureState('captured')
   }
 
   function handleUndo() {
     if (collectedColors.length === 0) return
-    playClick()
     const newCollected = [...collectedColors]
     const popped = newCollected.pop()
     setCollectedColors(newCollected)
@@ -145,7 +148,6 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
 
   function handleRedo() {
     if (redoStack.length === 0) return
-    playClick()
     const newRedo = [...redoStack]
     const popped = newRedo.pop()
     setRedoStack(newRedo)
@@ -155,7 +157,6 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
   }
 
   function handleContinue() {
-    playClick();
     setCaptureState('idle')
   }
 
@@ -243,7 +244,7 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
         </motion.button>
         <motion.button 
           style={styles.archiveBtn} 
-          onClick={() => { onArchive(); playClick(); }}
+          onClick={() => { onArchive(); }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >{t('archive')}</motion.button>
@@ -307,11 +308,19 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
         <div style={styles.actionRow}>
           {captureState === 'idle' ? (
             <motion.button 
-              style={{ ...styles.btnCapture, opacity: canCapture ? 1 : 0.3, cursor: canCapture ? 'pointer' : 'not-allowed' }} 
+              style={{ 
+                ...styles.btnCapture, 
+                backgroundColor: canCapture ? '#FFD700' : '#1A1714',
+                color: canCapture ? '#1A1714' : '#F5F0E8',
+                boxShadow: canCapture ? '0 0 20px rgba(255,215,0,0.4)' : 'none',
+                border: canCapture ? '2px solid #fff' : 'none'
+              }} 
               onClick={handleCapture}
-              whileHover={canCapture ? { scale: 1.02, backgroundColor: '#333' } : {}}
-              whileTap={canCapture ? { scale: 0.98 } : {}}
-            >{t('capture')}</motion.button>
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {canCapture ? t('perfectCapture') : t('capture')}
+            </motion.button>
           ) : (
             <>
               <motion.button 

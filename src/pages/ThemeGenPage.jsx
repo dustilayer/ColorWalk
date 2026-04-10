@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { motion } from 'motion/react'
+import { motion, AnimatePresence } from 'motion/react'
 import { generateTheme, getSeason, getChineseDate, SEASON_LABELS, generateMonochromatic } from '../utils/seasonColors'
 import { findNearestColor, hexToRgb } from '../utils/colorUtils'
 import { playClick, playChime } from '../utils/audio'
-import { Settings } from 'lucide-react'
+import { HexColorPicker } from 'react-colorful'
+import { Settings, X, BookOpen, Trophy, Volume2, VolumeX } from 'lucide-react'
 import { useLanguage } from '../contexts/LanguageContext'
 
 // 根据渐变两端均值亮度决定叠加文字颜色
@@ -15,41 +16,91 @@ function textColors(startHex, endHex) {
     : { main: 'rgba(245,240,232,0.95)', sub: 'rgba(245,240,232,0.6)' }
 }
 
-function ColorSwatch({ hex, onChange, label }) {
+function ColorSwatch({ hex, onChange, label, isRight }) {
+  const [showPicker, setShowPicker] = useState(false);
+  const pickerRef = useRef(null);
+  const buttonRef = useRef(null);
+
+  useEffect(() => {
+    if (!showPicker) return;
+    const handleOutside = (e) => {
+      // 如果点击的是按钮本身，让按钮自己的 onClick 处理切换逻辑
+      if (buttonRef.current && buttonRef.current.contains(e.target)) return;
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        setShowPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, [showPicker]);
+
   return (
-    <motion.div 
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}
-      whileHover={{ scale: 1.1, y: -4 }}
-      whileTap={{ scale: 0.95 }}
-      whileFocus={{ scale: 1.1, y: -4 }}
-    >
-      <label style={{ position: 'relative', cursor: 'pointer' }}>
-        <motion.div 
+    <div style={{ position: 'relative' }}>
+      <motion.div 
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <button 
+          ref={buttonRef}
+          onClick={() => setShowPicker(!showPicker)}
           style={{
-            width: 52, height: 52, borderRadius: 10,
+            width: 52, height: 52, borderRadius: '50%',
             backgroundColor: hex,
-            border: '1.5px solid rgba(255,255,255,0.5)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            border: '2.5px solid rgba(255,255,255,0.9)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            cursor: 'pointer',
+            padding: 0,
           }} 
-          whileHover={{ boxShadow: '0 8px 20px rgba(0,0,0,0.15)' }}
         />
-        <input
-          type="color" value={hex} onChange={e => {
-            onChange(e.target.value);
-          }}
-          style={{ position: 'absolute', opacity: 0, inset: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
-          onFocus={(e) => e.target.previousSibling.style.boxShadow = '0 0 0 3px rgba(255,255,255,0.8)'}
-          onBlur={(e) => e.target.previousSibling.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'}
-        />
-      </label>
-      <span style={{ fontFamily: '"Noto Serif SC", Georgia, serif', fontSize: '0.75rem', color: 'rgba(255,255,255,0.75)', letterSpacing: '0.08em' }}>
-        {label}
-      </span>
-    </motion.div>
+        <span style={{ fontFamily: '"Noto Serif SC", Georgia, serif', fontSize: '0.72rem', color: 'rgba(255,255,255,0.85)', letterSpacing: '0.05em' }}>
+          {label}
+        </span>
+      </motion.div>
+
+      <AnimatePresence>
+        {showPicker && (
+          <motion.div
+            ref={pickerRef}
+            initial={{ opacity: 0, y: 15, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.9 }}
+            style={{
+              position: 'absolute',
+              bottom: '110%',
+              left: isRight ? 'auto' : '50%',
+              right: isRight ? -20 : 'auto',
+              transform: isRight ? 'none' : 'translateX(-50%)',
+              backgroundColor: 'rgba(255,255,255,0.98)',
+              backdropFilter: 'blur(12px)',
+              borderRadius: 24,
+              padding: '1rem',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+              zIndex: 100,
+              width: 200,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+              <button onClick={() => setShowPicker(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                <X size={16} color="#7A6A5A" />
+              </button>
+            </div>
+
+            <div className="custom-picker">
+              <HexColorPicker color={hex} onChange={onChange} style={{ width: '100%', height: 160 }} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
-export default function ThemeGenPage({ onNext, onOpenSettings }) {
+export default function ThemeGenPage({ onNext, onOpenSettings, onOpenArchive, onOpenAchievements, bgmMuted, onToggleBgm }) {
   const { t } = useLanguage()
   const season = getSeason()
   const [theme, setTheme]     = useState(() => generateTheme(season))
@@ -197,30 +248,44 @@ export default function ThemeGenPage({ onNext, onOpenSettings }) {
         </p>
       </div>
 
-      {/* 右上角设置按钮 */}
-      <motion.button
-        style={{
-          position: 'absolute',
-          top: 'calc(3.5rem + env(safe-area-inset-top))',
-          right: '1.5rem',
-          zIndex: 10,
-          background: 'rgba(0,0,0,0.15)',
-          border: 'none',
-          borderRadius: '50%',
-          width: 40,
-          height: 40,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          backdropFilter: 'blur(8px)',
-        }}
-        onClick={(e) => { e.stopPropagation(); playClick(); onOpenSettings(); }}
-        whileHover={{ scale: 1.1, backgroundColor: 'rgba(0,0,0,0.25)' }}
-        whileTap={{ scale: 0.9 }}
-      >
-        <Settings size={20} color={tc.main} />
-      </motion.button>
+      {/* 右上角图标列 */}
+      <div style={{
+        position: 'absolute',
+        top: 'calc(3.5rem + env(safe-area-inset-top))',
+        right: '1.5rem',
+        zIndex: 10,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.625rem',
+      }}>
+        {[
+          { icon: <Settings size={20} color={tc.main} />, action: onOpenSettings },
+          { icon: <BookOpen size={20} color={tc.main} />, action: onOpenArchive },
+          { icon: <Trophy   size={20} color={tc.main} />, action: onOpenAchievements },
+          { icon: bgmMuted ? <VolumeX size={20} color={tc.main} /> : <Volume2 size={20} color={tc.main} />, action: onToggleBgm },
+        ].map(({ icon, action }, i) => (
+          <motion.button
+            key={i}
+            style={{
+              background: 'rgba(0,0,0,0.15)',
+              border: 'none',
+              borderRadius: '50%',
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)',
+            }}
+            onClick={(e) => { e.stopPropagation(); action?.() }}
+            whileHover={{ scale: 1.1, backgroundColor: 'rgba(0,0,0,0.25)' }}
+            whileTap={{ scale: 0.9 }}
+          >
+            {icon}
+          </motion.button>
+        ))}
+      </div>
 
       {/* 底部浮层 */}
       <div
@@ -246,7 +311,7 @@ export default function ThemeGenPage({ onNext, onOpenSettings }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem' }}>
               <ColorSwatch hex={customStart} onChange={handleStartChange} label={hexToName(customStart)} />
               <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '1.1rem' }}>→</span>
-              <ColorSwatch hex={customEnd}   onChange={handleEndChange}   label={hexToName(customEnd)}   />
+              <ColorSwatch hex={customEnd}   onChange={handleEndChange}   label={hexToName(customEnd)} isRight />
             </div>
           </div>
         )}
@@ -268,7 +333,7 @@ export default function ThemeGenPage({ onNext, onOpenSettings }) {
           <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>·</span>
           <motion.button 
             style={s.btnLink} 
-            onClick={e => { e.stopPropagation(); setCustomOpen(v => !v); playClick(); }}
+            onClick={e => { e.stopPropagation(); setCustomOpen(v => !v); }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
