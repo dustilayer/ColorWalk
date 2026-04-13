@@ -167,8 +167,8 @@ export default function GlobalSettingsPage({ onBack }) {
             <Mail size={20} color="var(--text-muted, #7A6A5A)" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
               <span style={{ fontSize: '0.9rem', color: 'var(--text-color, #1A1714)' }}>{t('feedback')}</span>
-              <a href="mailto:XXXX@XX.com" style={{ fontSize: '0.85rem', color: 'var(--text-muted, #7A6A5A)', textDecoration: 'none' }}>
-                XXXX@XX.com
+              <a href="mailto:backspace2026@yeah.net" style={{ fontSize: '0.85rem', color: 'var(--text-muted, #7A6A5A)', textDecoration: 'none' }}>
+                backspace2026@yeah.net
               </a>
             </div>
           </div>

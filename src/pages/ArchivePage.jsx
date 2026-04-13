@@ -44,8 +44,10 @@ function PhotoStack({ photos, colors, themeGradient }) {
     <div style={{ position: 'relative', width: 120, height: 98, flexShrink: 0, marginRight: '1rem' }}>
       {Array.from({ length: LAYERS }, (_, i) => {
         const isTop  = i === LAYERS - 1
-        const photo  = photos[i] ?? null
-        const bgColor = colors[i]?.hex ?? themeGradient.start.hex
+        // 倒序取照片：顶层 (i=2) 取 photos[0]，中层 (i=1) 取 photos[1]，底层 (i=0) 取 photos[2]
+        const photoIdx = LAYERS - 1 - i
+        const photo  = photos[photoIdx] ?? null
+        const bgColor = colors[photoIdx]?.hex ?? themeGradient.start.hex
         const rotate  = (i - center) * 7          // bottom:-7°  mid:0°  top:+7°
         const opacity = isTop ? 1 : 0.42 + i * 0.12
         const scale   = isTop ? 1 : 0.88 + i * 0.04
@@ -90,7 +92,7 @@ function PhotoStack({ photos, colors, themeGradient }) {
   )
 }
 
-function WalkCard({ record, onClick, onDelete, t, MODE_LABELS, STRICT_LABELS }) {
+function WalkCard({ record, onClick, onDelete, t, MODE_LABELS, STRICT_LABELS, hideMeta }) {
   const { themeGradient, collectedColors, strictLevel, date } = record
   // Keep nulls so PhotoStack can fill empty slots with color blocks
   const photos = collectedColors.map(c => c.photoUrl ?? null)
@@ -106,52 +108,56 @@ function WalkCard({ record, onClick, onDelete, t, MODE_LABELS, STRICT_LABELS }) 
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <div style={{
-        width: 6,
-        flexShrink: 0,
-        alignSelf: 'stretch',
-        background: `linear-gradient(to bottom, ${themeGradient.start.hex}, ${themeGradient.end.hex})`,
-      }} />
+      {!hideMeta && (
+        <div style={{
+          width: 6,
+          flexShrink: 0,
+          alignSelf: 'stretch',
+          background: `linear-gradient(to bottom, ${themeGradient.start.hex}, ${themeGradient.end.hex})`,
+        }} />
+      )}
 
       <div style={styles.cardContent}>
         <PhotoStack photos={photos} colors={collectedColors} themeGradient={themeGradient} />
 
-        <div style={styles.meta}>
-          <span style={styles.metaDate}>{formatDate(date)}</span>
-          <div style={styles.metaTags}>
-            <span style={styles.tag}>{STRICT_LABELS[strictLevel]}</span>
-            {(record.collectedColors || record.colors || []).some(c => c.isPerfect) && (
-              <span style={{ ...styles.tag, borderColor: '#FFD700', color: '#B8860B', display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Star size={10} fill="#FFD700" color="#FFD700" />
-                {t('perfectPhotos')}
-              </span>
+        {!hideMeta && (
+          <div style={styles.meta}>
+            <span style={styles.metaDate}>{formatDate(date)}</span>
+            <div style={styles.metaTags}>
+              <span style={styles.tag}>{STRICT_LABELS[strictLevel]}</span>
+              {(record.collectedColors || record.colors || []).some(c => c.isPerfect) && (
+                <span style={{ ...styles.tag, borderColor: '#FFD700', color: '#B8860B', display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Star size={10} fill="#FFD700" color="#FFD700" />
+                  {t('perfectPhotos')}
+                </span>
+              )}
+            </div>
+            {collectedColors.length > 0 && (
+              <span style={styles.metaCount}>{collectedColors.length} {t('colorsCount')}</span>
+            )}
+
+            {onDelete && (
+              confirming ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
+                  <span style={styles.deleteHint}>确认删除这条记录？</span>
+                  <button
+                    style={styles.confirmBtn}
+                    onClick={e => { e.stopPropagation(); onDelete(record.id) }}
+                  >确认</button>
+                  <button
+                    style={styles.cancelBtn}
+                    onClick={e => { e.stopPropagation(); setConfirming(false) }}
+                  >取消</button>
+                </div>
+              ) : (
+                <button
+                  style={styles.deleteBtn}
+                  onClick={e => { e.stopPropagation(); setConfirming(true) }}
+                >删除</button>
+              )
             )}
           </div>
-          {collectedColors.length > 0 && (
-            <span style={styles.metaCount}>{collectedColors.length} {t('colorsCount')}</span>
-          )}
-
-          {onDelete && (
-            confirming ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
-                <span style={styles.deleteHint}>确认删除这条记录？</span>
-                <button
-                  style={styles.confirmBtn}
-                  onClick={e => { e.stopPropagation(); onDelete(record.id) }}
-                >确认</button>
-                <button
-                  style={styles.cancelBtn}
-                  onClick={e => { e.stopPropagation(); setConfirming(false) }}
-                >取消</button>
-              </div>
-            ) : (
-              <button
-                style={styles.deleteBtn}
-                onClick={e => { e.stopPropagation(); setConfirming(true) }}
-              >删除</button>
-            )
-          )}
-        </div>
+        )}
       </div>
     </motion.div>
   )
@@ -159,54 +165,59 @@ function WalkCard({ record, onClick, onDelete, t, MODE_LABELS, STRICT_LABELS }) 
 
 function ColorStack({ bucket, walks, onSelectWalk, onDelete, t, MODE_LABELS, STRICT_LABELS }) {
   const [expanded, setExpanded] = useState(false)
+  const isStack = walks.length > 1
 
   return (
-    <div style={{ marginBottom: '1.5rem' }}>
+    <div style={{ marginBottom: '2.5rem' }}>
       <motion.div 
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
-          marginBottom: '0.75rem',
+          gap: '0.6rem',
+          marginBottom: '1rem',
           cursor: 'pointer',
         }}
         onClick={() => { setExpanded(!expanded); }}
         whileTap={{ scale: 0.98 }}
       >
-        <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: bucket.color }} />
-        <span style={{ fontFamily: '"Noto Serif SC", Georgia, serif', fontSize: '1rem', color: 'var(--text-color, #1A1714)' }}>
+        <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: bucket.color, boxShadow: `0 0 8px ${bucket.color}44` }} />
+        <span style={{ fontFamily: '"Noto Serif SC", Georgia, serif', fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-color, #1A1714)' }}>
           {bucket.name}{t('hueSeries')} ({walks.length})
         </span>
       </motion.div>
 
       {!expanded ? (
-        <div 
-          style={{ position: 'relative', height: 130, cursor: 'pointer' }}
-          onClick={() => { setExpanded(true); }}
-        >
-          {walks.slice(0, 3).map((record, idx) => (
-            <motion.div
-              key={record.id}
-              style={{
-                position: 'absolute',
-                top: idx * 8,
-                left: idx * 4,
-                right: -idx * 4,
-                zIndex: 3 - idx,
-                opacity: 1 - idx * 0.15,
-                transformOrigin: 'top center',
-              }}
-              whileHover={{ y: -4 }}
-            >
-              <WalkCard record={record} onClick={() => {}} t={t} MODE_LABELS={MODE_LABELS} STRICT_LABELS={STRICT_LABELS} />
-            </motion.div>
-          ))}
-        </div>
+        isStack ? (
+          <div 
+            style={{ position: 'relative', height: 150, cursor: 'pointer' }}
+            onClick={() => { setExpanded(true); }}
+          >
+            {walks.slice(0, 3).map((record, idx) => (
+              <motion.div
+                key={record.id}
+                style={{
+                  position: 'absolute',
+                  top: idx * 10,
+                  left: idx * 6,
+                  right: -idx * 6,
+                  zIndex: 10 - idx,
+                  opacity: 1 - idx * 0.15,
+                  transformOrigin: 'top center',
+                }}
+                whileHover={{ y: -4 }}
+              >
+                <WalkCard record={record} onClick={() => {}} t={t} MODE_LABELS={MODE_LABELS} STRICT_LABELS={STRICT_LABELS} hideMeta={idx > 0} />
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <WalkCard record={walks[0]} onClick={() => onSelectWalk(walks[0])} onDelete={onDelete} t={t} MODE_LABELS={MODE_LABELS} STRICT_LABELS={STRICT_LABELS} />
+        )
       ) : (
         <motion.div 
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
         >
           {walks.map((record) => (
             <WalkCard key={record.id} record={record} onClick={() => onSelectWalk(record)} onDelete={onDelete} t={t} MODE_LABELS={MODE_LABELS} STRICT_LABELS={STRICT_LABELS} />
@@ -478,8 +489,8 @@ const styles = {
     padding: '0 1.5rem 2.5rem',
   },
   card: {
-    minHeight: 130,
-    backgroundColor: 'var(--card-bg, rgba(255,255,255,0.55))',
+    minHeight: 120,
+    backgroundColor: '#FFFFFF',
     border: '1px solid var(--card-border, rgba(26,23,20,0.08))',
     borderRadius: 16,
     overflow: 'hidden',
@@ -489,7 +500,8 @@ const styles = {
     textAlign: 'left',
     width: '100%',
     padding: 0,
-    transition: 'background-color 0.3s ease, border-color 0.3s ease',
+    transition: 'background-color 0.3s ease, border-color 0.3s ease, transform 0.2s ease',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
   },
   cardContent: {
     flex: 1,

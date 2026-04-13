@@ -43,12 +43,12 @@ export function generateTheme(season) {
   }
 }
 
-export function generateMonochromatic(hex, isLight = true) {
+export function generateMonochromatic(hex) {
   const { r, g, b } = hexToRgb(hex)
   const [h, s, l] = rgbToHsl(r, g, b)
   
-  // If we pick a color, generate a darker/lighter version of it
-  const newL = isLight ? Math.max(15, l - 35) : Math.min(92, l + 35)
+  // If we pick a color, generate a darker/lighter version of it based on its current lightness
+  const newL = l > 50 ? Math.max(15, l - 35) : Math.min(92, l + 35)
   const rgb = hslToRgb(h, s, newL)
   const newHex = rgbToHex(rgb.r, rgb.g, rgb.b)
   

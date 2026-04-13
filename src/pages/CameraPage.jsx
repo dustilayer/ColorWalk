@@ -94,21 +94,38 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
   // 截取当前帧（缩放至 480px 宽，控制体积）
   function captureFrame() {
     const video = videoRef.current
-    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null
-    const W = 480
-    const H = Math.round(video.videoHeight * (W / video.videoWidth))
-    const cap = document.createElement('canvas')
-    cap.width = W; cap.height = H
-    const ctx = cap.getContext('2d')
-    if (facingMode === 'user') {
-      ctx.translate(W, 0)
-      ctx.scale(-1, 1)
+    const mainCanvas = canvasRef.current
+    
+    // 优先尝试从 video 截取
+    if (video && video.readyState >= 2 && video.videoWidth && video.videoHeight) {
+      const W = 480
+      const H = Math.round(video.videoHeight * (W / video.videoWidth))
+      const cap = document.createElement('canvas')
+      cap.width = W; cap.height = H
+      const ctx = cap.getContext('2d')
+      if (facingMode === 'user') {
+        ctx.translate(W, 0)
+        ctx.scale(-1, 1)
+      }
+      ctx.drawImage(video, 0, 0, W, H)
+      return cap.toDataURL('image/jpeg', 0.85)
     }
-    ctx.drawImage(video, 0, 0, W, H)
-    return cap.toDataURL('image/jpeg', 0.82)
+    
+    // 如果 video 不可用，尝试从正在采样的 mainCanvas 截取
+    if (mainCanvas && mainCanvas.width > 0) {
+      const W = 480
+      const H = Math.round(mainCanvas.height * (W / mainCanvas.width))
+      const cap = document.createElement('canvas')
+      cap.width = W; cap.height = H
+      const ctx = cap.getContext('2d')
+      ctx.drawImage(mainCanvas, 0, 0, W, H)
+      return cap.toDataURL('image/jpeg', 0.85)
+    }
+
+    return null
   }
 
-  function handleCapture() {
+  async function handleCapture() {
     const matchScore = computeMatchScore({ r: smoothRef.current.r, g: smoothRef.current.g, b: smoothRef.current.b }, themeGradient)
     const threshold = strictLevel === 'ambient' ? 40 : strictLevel === 'hunter' ? 80 : 100
     const isPerfect = matchScore >= threshold;
@@ -128,7 +145,14 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
       hex: rgbToHex(s.r, s.g, s.b),
       name: findNearestColor(s.r, s.g, s.b),
     }
-    const photoUrl = captureFrame()
+    
+    let photoUrl = captureFrame()
+    // 如果第一次抓取失败，延迟 50ms 再试一次
+    if (!photoUrl) {
+      await new Promise(r => setTimeout(r, 50))
+      photoUrl = captureFrame()
+    }
+    
     const entry = { ...color, photoUrl, isPerfect }
 
     setLastCapture(entry)

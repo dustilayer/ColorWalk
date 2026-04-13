@@ -10,7 +10,7 @@ import { setClickVolume, setCaptureVolume, setBgmVolume, getBgmVolume } from './
 import { LanguageProvider } from './contexts/LanguageContext'
 import './App.css'
 
-const BGM_TRACKS = ['/audio/bgm_mp3.mp3', '/audio/bgm1_mp3.mp3']
+const BGM_TRACKS = ['./audio/bgm.mp3', './audio/bgm1.mp3']
 
 function getRandomNextIdx(current, total) {
   if (total <= 1) return 0
@@ -26,13 +26,19 @@ function AppContent() {
   const [bgmMuted, setBgmMutedState] = useState(
     () => localStorage.getItem('bgmMuted') === 'true'
   )
+  const [currentTrackIdx, setCurrentTrackIdx] = useState(() => Math.floor(Math.random() * BGM_TRACKS.length))
 
   function handleToggleBgm() {
     const next = !bgmMuted
     setBgmMutedState(next)
     localStorage.setItem('bgmMuted', String(next))
     const bgm = document.getElementById('bgm-player')
-    if (bgm) bgm.muted = next
+    if (bgm) {
+      bgm.muted = next
+      if (!next && bgm.paused) {
+        bgm.play().catch(e => console.error('BGM play failed:', e))
+      }
+    }
   }
 
   useEffect(() => {
@@ -51,28 +57,11 @@ function AppContent() {
     else if (savedTheme === 'light') document.body.classList.add('light-theme')
 
     // BGM — start on first user interaction
-    let currentTrackIdx = Math.floor(Math.random() * BGM_TRACKS.length)
-
     const handleFirstInteraction = () => {
       const bgm = document.getElementById('bgm-player')
-      if (bgm) {
+      if (bgm && bgm.paused && !bgmMuted) {
         bgm.volume = getBgmVolume()
-        bgm.muted  = localStorage.getItem('bgmMuted') === 'true'
-        bgm.src    = BGM_TRACKS[currentTrackIdx]
-        bgm.load()
-        bgm.play().catch(() => {})
-
-        bgm.onended = () => {
-          currentTrackIdx = getRandomNextIdx(currentTrackIdx, BGM_TRACKS.length)
-          bgm.src = BGM_TRACKS[currentTrackIdx]
-          bgm.play().catch(() => {})
-        }
-
-        bgm.onerror = () => {
-          currentTrackIdx = getRandomNextIdx(currentTrackIdx, BGM_TRACKS.length)
-          bgm.src = BGM_TRACKS[currentTrackIdx]
-          bgm.play().catch(() => {})
-        }
+        bgm.play().catch(e => console.error('BGM play failed on interaction:', e))
       }
       window.removeEventListener('click',      handleFirstInteraction)
       window.removeEventListener('touchstart', handleFirstInteraction)
@@ -85,7 +74,22 @@ function AppContent() {
       window.removeEventListener('click',      handleFirstInteraction)
       window.removeEventListener('touchstart', handleFirstInteraction)
     }
-  }, [])
+  }, [bgmMuted])
+
+  const handleBgmEnded = () => {
+    setCurrentTrackIdx(prev => getRandomNextIdx(prev, BGM_TRACKS.length))
+  }
+
+  useEffect(() => {
+    const bgm = document.getElementById('bgm-player')
+    if (bgm) {
+      bgm.volume = getBgmVolume()
+      // When track changes, play it if it was already playing or if it's supposed to play
+      if (!bgmMuted) {
+        bgm.play().catch(e => console.error('BGM play failed on track change:', e))
+      }
+    }
+  }, [currentTrackIdx, bgmMuted])
 
   function handleThemeNext(themeGradient) {
     setWalkConfig(c => ({ ...c, themeGradient }))
@@ -119,7 +123,13 @@ function AppContent() {
 
   return (
     <>
-      <audio id="bgm-player" loop={false} />
+      <audio 
+        id="bgm-player" 
+        loop={false} 
+        src={BGM_TRACKS[currentTrackIdx]} 
+        onEnded={handleBgmEnded}
+        onError={handleBgmEnded}
+      />
       {step === 'theme' && (
         <ThemeGenPage
           key="theme"

@@ -7,9 +7,17 @@
 }
 
 @keyframes gradientFlow {
-  0%   { background-position: 0%   50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0%   50%; }
+  0%   { background-position: 0%   0%; }
+  25%  { background-position: 100% 0%; }
+  50%  { background-position: 100% 100%; }
+  75%  { background-position: 0%   100%; }
+  100% { background-position: 0%   0%; }
+}
+
+@keyframes rotateBg {
+  0%   { transform: rotate(0deg) scale(1.2); }
+  50%  { transform: rotate(180deg) scale(1.5); }
+  100% { transform: rotate(360deg) scale(1.2); }
 }
 
 /* 隐藏滚动条（swiper 用） */

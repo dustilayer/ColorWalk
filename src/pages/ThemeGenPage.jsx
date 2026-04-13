@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { generateTheme, getSeason, getChineseDate, SEASON_LABELS, generateMonochromatic } from '../utils/seasonColors'
-import { findNearestColor, hexToRgb } from '../utils/colorUtils'
+import { findNearestColor, hexToRgb, rgbToHsl, hslToRgb, rgbToHex } from '../utils/colorUtils'
 import { playClick, playChime } from '../utils/audio'
 import { HexColorPicker } from 'react-colorful'
 import { Settings, X, BookOpen, Trophy, Volume2, VolumeX } from 'lucide-react'
@@ -114,16 +114,48 @@ export default function ThemeGenPage({ onNext, onOpenSettings, onOpenArchive, on
   const rafRef     = useRef(null)
 
   const handleStartChange = (hex) => {
+    const oldRgb = hexToRgb(customStart)
+    const newRgb = hexToRgb(hex)
+    const oldHsl = rgbToHsl(oldRgb.r, oldRgb.g, oldRgb.b)
+    const newHsl = rgbToHsl(newRgb.r, newRgb.g, newRgb.b)
+    
     setCustomStart(hex)
-    const mono = generateMonochromatic(hex, true)
-    setCustomEnd(mono.hex)
+    
+    // 计算色相差，处理 360 度环绕
+    let hueDiff = Math.abs(oldHsl[0] - newHsl[0])
+    if (hueDiff > 180) hueDiff = 360 - hueDiff
+    
+    // 如果色相（Hue）发生了明显变化（拖动了底部的长条），且不是变成了纯灰/黑/白，则同步另一个颜色的色相
+    if (hueDiff > 2 && newHsl[1] > 2) {
+      const endRgb = hexToRgb(customEnd)
+      const endHsl = rgbToHsl(endRgb.r, endRgb.g, endRgb.b)
+      const newEndRgb = hslToRgb(newHsl[0], endHsl[1], endHsl[2])
+      setCustomEnd(rgbToHex(newEndRgb.r, newEndRgb.g, newEndRgb.b))
+    }
+    
     playChime(400 + Math.random() * 400)
   }
 
   const handleEndChange = (hex) => {
+    const oldRgb = hexToRgb(customEnd)
+    const newRgb = hexToRgb(hex)
+    const oldHsl = rgbToHsl(oldRgb.r, oldRgb.g, oldRgb.b)
+    const newHsl = rgbToHsl(newRgb.r, newRgb.g, newRgb.b)
+    
     setCustomEnd(hex)
-    const mono = generateMonochromatic(hex, false)
-    setCustomStart(mono.hex)
+    
+    // 计算色相差，处理 360 度环绕
+    let hueDiff = Math.abs(oldHsl[0] - newHsl[0])
+    if (hueDiff > 180) hueDiff = 360 - hueDiff
+    
+    // 如果色相（Hue）发生了明显变化（拖动了底部的长条），且不是变成了纯灰/黑/白，则同步另一个颜色的色相
+    if (hueDiff > 2 && newHsl[1] > 2) {
+      const startRgb = hexToRgb(customStart)
+      const startHsl = rgbToHsl(startRgb.r, startRgb.g, startRgb.b)
+      const newStartRgb = hslToRgb(newHsl[0], startHsl[1], startHsl[2])
+      setCustomStart(rgbToHex(newStartRgb.r, newStartRgb.g, newStartRgb.b))
+    }
+    
     playChime(400 + Math.random() * 400)
   }
 
@@ -178,6 +210,9 @@ export default function ThemeGenPage({ onNext, onOpenSettings, onOpenArchive, on
   }
 
   const handlePointerDown = useCallback((e) => {
+    // 如果点击的是 UI 元素（右上角图标或底部浮层），不触发涟漪
+    if (e.target.closest('button') || e.target.closest('.ui-layer')) return
+    
     const x = e.clientX ?? e.touches?.[0]?.clientX ?? 0
     const y = e.clientY ?? e.touches?.[0]?.clientY ?? 0
     spawnRipple(x, y)
@@ -215,11 +250,11 @@ export default function ThemeGenPage({ onNext, onOpenSettings, onOpenArchive, on
       <div
         style={{
           position: 'absolute',
-          inset: -200, // 扩大范围防止旋转时露边
+          inset: -300, // 扩大范围防止旋转时露边
           backgroundImage: `linear-gradient(${bgAngle}deg, ${displayTheme.start.hex}, ${displayTheme.end.hex}, ${displayTheme.start.hex})`,
-          backgroundSize: '300% 300%',
-          animation: 'gradientFlow 30s ease-in-out infinite, rotateBg 45s linear infinite',
-          filter: 'blur(60px)',
+          backgroundSize: '200% 200%',
+          animation: 'gradientFlow 15s ease-in-out infinite, rotateBg 30s linear infinite',
+          filter: 'blur(80px)',
           zIndex: -1,
         }}
       />
@@ -249,7 +284,7 @@ export default function ThemeGenPage({ onNext, onOpenSettings, onOpenArchive, on
       </div>
 
       {/* 右上角图标列 */}
-      <div style={{
+      <div className="ui-layer" style={{
         position: 'absolute',
         top: 'calc(3.5rem + env(safe-area-inset-top))',
         right: '1.5rem',
@@ -289,6 +324,7 @@ export default function ThemeGenPage({ onNext, onOpenSettings, onOpenArchive, on
 
       {/* 底部浮层 */}
       <div
+        className="ui-layer"
         style={{
           position: 'absolute',
           bottom: 0, left: 0, right: 0,
@@ -299,8 +335,6 @@ export default function ThemeGenPage({ onNext, onOpenSettings, onOpenArchive, on
           padding: '1rem 1.5rem',
           paddingBottom: 'calc(1.75rem + env(safe-area-inset-bottom))',
         }}
-        onMouseDown={e => e.stopPropagation()}
-        onTouchStart={e => e.stopPropagation()}
       >
         {/* 自定义色带（展开） */}
         {customOpen && (
