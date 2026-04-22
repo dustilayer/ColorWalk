@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'motion/react'
 import { getWalks, deleteWalk } from '../utils/archive'
+import { getPhoto, photoKey } from '../utils/storage'
 import { useLanguage } from '../contexts/LanguageContext'
 import EndPage from './EndPage'
 import { Calendar, Palette, Star, Trophy } from 'lucide-react'
@@ -35,8 +36,22 @@ function formatDate(isoString) {
 }
 
 // 始终渲染 3 层堆叠，统一卡片感
-// photos: c.photoUrl 数组（含 null），colors: collectedColors，themeGradient: 渐变兜底色
-function PhotoStack({ photos, colors, themeGradient }) {
+// walkId + colors: 从 IndexedDB 异步加载照片；themeGradient: 渐变兜底色
+function PhotoStack({ walkId, colors, themeGradient }) {
+  const [loadedPhotos, setLoadedPhotos] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      const photos = await Promise.all(
+        (colors || []).slice(0, 3).map((_, i) => getPhoto(photoKey(walkId, i)))
+      )
+      if (!cancelled) setLoadedPhotos(photos)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [walkId, colors])
+
   const LAYERS = 3
   const center = (LAYERS - 1) / 2  // = 1
 
@@ -46,7 +61,7 @@ function PhotoStack({ photos, colors, themeGradient }) {
         const isTop  = i === LAYERS - 1
         // 倒序取照片：顶层 (i=2) 取 photos[0]，中层 (i=1) 取 photos[1]，底层 (i=0) 取 photos[2]
         const photoIdx = LAYERS - 1 - i
-        const photo  = photos[photoIdx] ?? null
+        const photo  = loadedPhotos[photoIdx] ?? null
         const bgColor = colors[photoIdx]?.hex ?? themeGradient.start.hex
         const rotate  = (i - center) * 7          // bottom:-7°  mid:0°  top:+7°
         const opacity = isTop ? 1 : 0.42 + i * 0.12
@@ -93,9 +108,7 @@ function PhotoStack({ photos, colors, themeGradient }) {
 }
 
 function WalkCard({ record, onClick, onDelete, t, MODE_LABELS, STRICT_LABELS, hideMeta }) {
-  const { themeGradient, collectedColors, strictLevel, date } = record
-  // Keep nulls so PhotoStack can fill empty slots with color blocks
-  const photos = collectedColors.map(c => c.photoUrl ?? null)
+  const { id, themeGradient, collectedColors, strictLevel, date } = record
   const [confirming, setConfirming] = useState(false)
 
   return (
@@ -118,7 +131,7 @@ function WalkCard({ record, onClick, onDelete, t, MODE_LABELS, STRICT_LABELS, hi
       )}
 
       <div style={styles.cardContent}>
-        <PhotoStack photos={photos} colors={collectedColors} themeGradient={themeGradient} />
+        <PhotoStack walkId={id} colors={collectedColors} themeGradient={themeGradient} />
 
         {!hideMeta && (
           <div style={styles.meta}>
@@ -228,12 +241,40 @@ function ColorStack({ bucket, walks, onSelectWalk, onDelete, t, MODE_LABELS, STR
   )
 }
 
+function PerfectGridItem({ photo, index, onPress }) {
+  const [src, setSrc] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getPhoto(photoKey(photo.walkId, photo.colorIndex)).then(url => {
+      if (!cancelled) setSrc(url)
+    })
+    return () => { cancelled = true }
+  }, [photo.walkId, photo.colorIndex])
+
+  return (
+    <motion.div
+      style={{ ...styles.perfectItem, backgroundColor: photo.hex }}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: index * 0.05 }}
+      onClick={onPress}
+    >
+      {src && <img src={src} alt="" style={styles.perfectImg} />}
+      <div style={styles.perfectOverlay}>
+        <Star size={12} fill="#FFD700" color="#FFD700" />
+        <span style={styles.perfectName}>{photo.name}</span>
+      </div>
+    </motion.div>
+  )
+}
+
 export default function ArchivePage({ onStartWalk, onAchievements }) {
   const { t } = useLanguage()
   const [walks, setWalks] = useState(() => getWalks())
 
-  function handleDelete(id) {
-    deleteWalk(id)
+  async function handleDelete(id) {
+    await deleteWalk(id)
     setWalks(prev => prev.filter(w => w.id !== id))
   }
   const [detail, setDetail] = useState(null)
@@ -271,9 +312,9 @@ export default function ArchivePage({ onStartWalk, onAchievements }) {
     const photos = []
     walks.forEach(w => {
       const colors = w.collectedColors || w.colors || []
-      colors.forEach(c => {
+      colors.forEach((c, colorIndex) => {
         if (c.isPerfect) {
-          photos.push({ ...c, walkId: w.id, date: w.date })
+          photos.push({ ...c, walkId: w.id, date: w.date, colorIndex })
         }
       })
     })
@@ -365,23 +406,15 @@ export default function ArchivePage({ onStartWalk, onAchievements }) {
       ) : (
         <div style={styles.perfectGrid}>
           {perfectPhotos.map((photo, i) => (
-            <motion.div 
-              key={i} 
-              style={styles.perfectItem}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.05 }}
-              onClick={() => {
+            <PerfectGridItem
+              key={i}
+              photo={photo}
+              index={i}
+              onPress={() => {
                 const walk = walks.find(w => w.id === photo.walkId)
                 if (walk) setDetail(walk)
               }}
-            >
-              <img src={photo.photoUrl} alt="" style={styles.perfectImg} />
-              <div style={styles.perfectOverlay}>
-                <Star size={12} fill="#FFD700" color="#FFD700" />
-                <span style={styles.perfectName}>{photo.name}</span>
-              </div>
-            </motion.div>
+            />
           ))}
           {perfectPhotos.length === 0 && (
             <div style={{ gridColumn: '1/-1', textAlign: 'center', paddingTop: '4rem', opacity: 0.5 }}>
@@ -475,7 +508,7 @@ const styles = {
     gap: '0.25rem',
   },
   perfectName: {
-    color: 'white',
+    color: 'rgba(245,240,232,0.95)',
     fontSize: '0.6rem',
     fontFamily: '"Noto Serif SC", serif',
     whiteSpace: 'nowrap',
@@ -490,7 +523,7 @@ const styles = {
   },
   card: {
     minHeight: 120,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'var(--card-bg, #F5F0E8)',
     border: '1px solid var(--card-border, rgba(26,23,20,0.08))',
     borderRadius: 16,
     overflow: 'hidden',

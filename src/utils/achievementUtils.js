@@ -1,6 +1,20 @@
 import { achievements } from '../data/achievements'
 
 const STORAGE_KEY = 'colorwalk_achievements'
+const SALT = 'colorwalk_salt'
+
+// Simple non-cryptographic hash to deter casual tampering
+function simpleHash(str) {
+  let h = 0
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(31, h) + str.charCodeAt(i) | 0
+  }
+  return Math.abs(h).toString(36)
+}
+
+function makeChecksum(id, unlockedAt) {
+  return simpleHash(id + unlockedAt + SALT)
+}
 
 function getLocalDateStr(isoString) {
   const d = new Date(isoString)
@@ -41,7 +55,12 @@ export function checkAchievements(record, allRecords) {
 
   function tryUnlock(id) {
     if (!unlocked[id]) {
-      unlocked[id] = { unlocked: true, unlockedAt: new Date().toISOString() }
+      const unlockedAt = new Date().toISOString()
+      unlocked[id] = {
+        unlocked: true,
+        unlockedAt,
+        checksum: makeChecksum(id, unlockedAt),
+      }
       const def = achievements.find(a => a.id === id)
       if (def) newlyUnlocked.push(def)
     }

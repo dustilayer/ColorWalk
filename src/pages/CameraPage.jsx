@@ -36,8 +36,16 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
         })
         if (videoRef.current) videoRef.current.srcObject = stream
       } catch (err) {
-        setError(t('cameraError'))
-        console.error(err)
+        const name = err.name || ''
+        let msg
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+          msg = '请在系统设置中允许访问相机'
+        } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+          msg = '未找到可用摄像头'
+        } else {
+          msg = '相机启动失败，请刷新重试'
+        }
+        setError(msg)
       }
     }
     startCamera()
@@ -224,7 +232,12 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
         style={{ position: 'absolute', inset: 0, backgroundColor: 'white', pointerEvents: 'none', zIndex: 10 }}
       />
       <canvas ref={canvasRef} style={{ display: 'none' }} />
-      {error && <div style={styles.errorBanner}>{error}</div>}
+      {error && (
+        <div style={styles.errorBanner}>
+          <div style={styles.errorIcon}>📷</div>
+          <p style={styles.errorText}>{error}</p>
+        </div>
+      )}
 
       {/* 顶部操作栏 */}
       <div style={styles.topBar}>
@@ -387,14 +400,31 @@ const styles = {
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    backgroundColor: 'rgba(245,240,232,0.92)',
-    color: '#1A1714',
-    fontFamily: '"Noto Serif SC", Georgia, serif',
-    fontSize: '1rem',
-    padding: '1.5rem 2rem',
-    borderRadius: '16px',
+    backgroundColor: 'rgba(245,240,232,0.96)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    borderRadius: 20,
+    padding: '2rem 2rem 1.75rem',
     textAlign: 'center',
     maxWidth: '80%',
+    width: 280,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.75rem',
+    boxShadow: '0 8px 32px rgba(26,23,20,0.18)',
+  },
+  errorIcon: {
+    fontSize: '2rem',
+    lineHeight: 1,
+  },
+  errorText: {
+    fontFamily: '"Noto Serif SC", Georgia, serif',
+    fontSize: '0.95rem',
+    color: '#1A1714',
+    margin: 0,
+    letterSpacing: '0.06em',
+    lineHeight: 1.7,
   },
   topBar: {
     position: 'absolute',

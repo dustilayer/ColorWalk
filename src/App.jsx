@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ThemeGenPage from './pages/ThemeGenPage'
 import SettingsPage from './pages/SettingsPage'
 import GlobalSettingsPage from './pages/GlobalSettingsPage'
@@ -8,15 +8,46 @@ import ArchivePage from './pages/ArchivePage'
 import AchievementPage from './pages/AchievementPage'
 import { setClickVolume, setCaptureVolume, setBgmVolume, getBgmVolume } from './utils/audio'
 import { LanguageProvider } from './contexts/LanguageContext'
+import { savePhoto, photoKey } from './utils/storage'
 import './App.css'
 
-const BGM_TRACKS = ['./audio/bgm.mp3', './audio/bgm1.mp3']
+const SCHEMA_VERSION = '1.0'
+const BGM_TRACKS = ['/audio/bgm.mp3', '/audio/bgm1.mp3']
 
 function getRandomNextIdx(current, total) {
   if (total <= 1) return 0
   let next
   do { next = Math.floor(Math.random() * total) } while (next === current)
   return next
+}
+
+// Migrate old records that stored base64 photoUrls in localStorage → IndexedDB
+async function migrateToV1() {
+  try {
+    const key = 'colorwalk_archive_v4'
+    const raw = localStorage.getItem(key)
+    if (!raw) return
+    const walks = JSON.parse(raw)
+    let changed = false
+
+    for (const walk of walks) {
+      for (let i = 0; i < (walk.collectedColors || []).length; i++) {
+        const c = walk.collectedColors[i]
+        if (c.photoUrl && c.photoUrl.startsWith('data:')) {
+          await savePhoto(photoKey(walk.id, i), c.photoUrl)
+          delete c.photoUrl
+          changed = true
+        }
+      }
+    }
+
+    if (changed) {
+      localStorage.setItem(key, JSON.stringify(walks))
+    }
+  } catch (e) {
+    // Migration failed — degrade gracefully, never clear data
+    console.warn('[ColorWalk] Schema migration failed:', e)
+  }
 }
 
 function AppContent() {
@@ -26,7 +57,67 @@ function AppContent() {
   const [bgmMuted, setBgmMutedState] = useState(
     () => localStorage.getItem('bgmMuted') === 'true'
   )
-  const [currentTrackIdx, setCurrentTrackIdx] = useState(() => Math.floor(Math.random() * BGM_TRACKS.length))
+  const [currentTrackIdx, setCurrentTrackIdx] = useState(
+    () => Math.floor(Math.random() * BGM_TRACKS.length)
+  )
+  const isFirstTrackRender = useRef(true)
+
+  // ── Schema version check ─────────────────────────────────────────
+  useEffect(() => {
+    const stored = localStorage.getItem('colorwalk_schema_version')
+    if (stored !== SCHEMA_VERSION) {
+      migrateToV1().then(() => {
+        localStorage.setItem('colorwalk_schema_version', SCHEMA_VERSION)
+      })
+    }
+  }, [])
+
+  // ── App settings ─────────────────────────────────────────────────
+  useEffect(() => {
+    const savedClick   = localStorage.getItem('clickVolume')
+    const savedCapture = localStorage.getItem('captureVolume')
+    const savedBgm     = localStorage.getItem('bgmVolume')
+    const savedTheme   = localStorage.getItem('appTheme')
+
+    if (savedClick   !== null) setClickVolume(parseFloat(savedClick))
+    if (savedCapture !== null) setCaptureVolume(parseFloat(savedCapture))
+    setBgmVolume(savedBgm !== null ? parseFloat(savedBgm) : 0.3)
+
+    if (savedTheme === 'dark')  document.body.classList.add('dark-theme')
+    else if (savedTheme === 'light') document.body.classList.add('light-theme')
+  }, [])
+
+  // ── BGM: first user interaction ──────────────────────────────────
+  useEffect(() => {
+    function handleFirstInteraction() {
+      const bgm = document.getElementById('bgm-player')
+      if (bgm && bgm.paused && !bgmMuted) {
+        bgm.volume = getBgmVolume()
+        bgm.play().catch(() => {})
+      }
+      window.removeEventListener('click',      handleFirstInteraction)
+      window.removeEventListener('touchstart', handleFirstInteraction)
+    }
+    window.addEventListener('click',      handleFirstInteraction)
+    window.addEventListener('touchstart', handleFirstInteraction)
+    return () => {
+      window.removeEventListener('click',      handleFirstInteraction)
+      window.removeEventListener('touchstart', handleFirstInteraction)
+    }
+  }, [bgmMuted])
+
+  // ── BGM: track change (skip on initial mount to respect autoplay policy) ──
+  useEffect(() => {
+    if (isFirstTrackRender.current) {
+      isFirstTrackRender.current = false
+      return
+    }
+    const bgm = document.getElementById('bgm-player')
+    if (bgm && !bgmMuted) {
+      bgm.volume = getBgmVolume()
+      bgm.play().catch(() => {})
+    }
+  }, [currentTrackIdx]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleToggleBgm() {
     const next = !bgmMuted
@@ -36,61 +127,16 @@ function AppContent() {
     if (bgm) {
       bgm.muted = next
       if (!next && bgm.paused) {
-        bgm.play().catch(e => console.error('BGM play failed:', e))
+        bgm.play().catch(() => {})
       }
     }
   }
-
-  useEffect(() => {
-    // Volume settings
-    const savedClick   = localStorage.getItem('clickVolume')
-    const savedCapture = localStorage.getItem('captureVolume')
-    const savedBgm     = localStorage.getItem('bgmVolume')
-    const savedTheme   = localStorage.getItem('appTheme')
-
-    if (savedClick   !== null) setClickVolume(parseFloat(savedClick))
-    if (savedCapture !== null) setCaptureVolume(parseFloat(savedCapture))
-    // Always set bgm volume — defaults to 0.3 if no saved value
-    setBgmVolume(savedBgm !== null ? parseFloat(savedBgm) : 0.3)
-
-    if (savedTheme === 'dark')  document.body.classList.add('dark-theme')
-    else if (savedTheme === 'light') document.body.classList.add('light-theme')
-
-    // BGM — start on first user interaction
-    const handleFirstInteraction = () => {
-      const bgm = document.getElementById('bgm-player')
-      if (bgm && bgm.paused && !bgmMuted) {
-        bgm.volume = getBgmVolume()
-        bgm.play().catch(e => console.error('BGM play failed on interaction:', e))
-      }
-      window.removeEventListener('click',      handleFirstInteraction)
-      window.removeEventListener('touchstart', handleFirstInteraction)
-    }
-
-    window.addEventListener('click',      handleFirstInteraction)
-    window.addEventListener('touchstart', handleFirstInteraction)
-
-    return () => {
-      window.removeEventListener('click',      handleFirstInteraction)
-      window.removeEventListener('touchstart', handleFirstInteraction)
-    }
-  }, [bgmMuted])
 
   const handleBgmEnded = () => {
     setCurrentTrackIdx(prev => getRandomNextIdx(prev, BGM_TRACKS.length))
   }
 
-  useEffect(() => {
-    const bgm = document.getElementById('bgm-player')
-    if (bgm) {
-      bgm.volume = getBgmVolume()
-      // When track changes, play it if it was already playing or if it's supposed to play
-      if (!bgmMuted) {
-        bgm.play().catch(e => console.error('BGM play failed on track change:', e))
-      }
-    }
-  }, [currentTrackIdx, bgmMuted])
-
+  // ── Navigation ───────────────────────────────────────────────────
   function handleThemeNext(themeGradient) {
     setWalkConfig(c => ({ ...c, themeGradient }))
     setStep('settings')
@@ -123,12 +169,12 @@ function AppContent() {
 
   return (
     <>
-      <audio 
-        id="bgm-player" 
-        loop={false} 
-        src={BGM_TRACKS[currentTrackIdx]} 
+      <audio
+        id="bgm-player"
+        loop={false}
+        src={BGM_TRACKS[currentTrackIdx]}
         onEnded={handleBgmEnded}
-        onError={handleBgmEnded}
+        onError={() => {}}
       />
       {step === 'theme' && (
         <ThemeGenPage

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Star } from 'lucide-react'
-import { saveWalk, getWalks } from '../utils/archive'
+import { saveWalk, getWalks, loadPhotosIntoWalk } from '../utils/archive'
 import { downloadCard, shareCard } from '../utils/exportCard'
 import { useLanguage } from '../contexts/LanguageContext'
 import { checkAchievements } from '../utils/achievementUtils'
@@ -298,6 +298,18 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
   const [sharing, setSharing] = useState(false)
   const [currentIdx, setCurrentIdx] = useState(0)
   const [newAchievements, setNewAchievements] = useState([])
+  // For readonly (archive) mode, photos come from IndexedDB; for fresh walk, photos are in memory
+  const [displayRecord, setDisplayRecord] = useState(record)
+
+  useEffect(() => {
+    if (readonly) {
+      // Load photos from IndexedDB for archive view
+      loadPhotosIntoWalk(record).then(r => setDisplayRecord(r))
+    } else {
+      // Fresh walk — photos are already in memory
+      setDisplayRecord(record)
+    }
+  }, [readonly, record])
 
   useEffect(() => {
     if (readonly) return
@@ -309,23 +321,23 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
   const MODE_LABELS = { single: t('singleColor'), free: t('freeColor') }
   const STRICT_LABELS = { ambient: t('ambient'), hunter: t('hunter'), precise: t('precise') }
 
-  function handleSaveArchive() {
-    saveWalk(record)
+  async function handleSaveArchive() {
+    await saveWalk(record)
     setSaved(true)
   }
 
   async function handleDownload() {
     setDownloading(true)
-    await downloadCard(record, currentIdx)
+    await downloadCard(displayRecord, currentIdx)
     setDownloading(false)
   }
 
   async function handleShare() {
     setSharing(true)
     try {
-      const success = await shareCard(record, currentIdx)
+      const success = await shareCard(displayRecord, currentIdx)
       if (!success) {
-        await downloadCard(record, currentIdx)
+        await downloadCard(displayRecord, currentIdx)
       }
     } catch (e) {
       console.error(e)
@@ -348,8 +360,8 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
       />
       <div style={styles.topNav}>
         {readonly
-          ? <motion.button 
-              style={styles.navBtn} 
+          ? <motion.button
+              style={styles.navBtn}
               onClick={() => { onBack(); }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -362,9 +374,9 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingBottom: readonly ? '2rem' : 0 }}>
-        {record.mode === 'single' 
-          ? <SingleCard record={record} currentIdx={currentIdx} onIndexChange={setCurrentIdx} t={t} /> 
-          : <FreeCard record={record} currentIdx={currentIdx} onIndexChange={setCurrentIdx} t={t} />
+        {record.mode === 'single'
+          ? <SingleCard record={displayRecord} currentIdx={currentIdx} onIndexChange={setCurrentIdx} t={t} />
+          : <FreeCard record={displayRecord} currentIdx={currentIdx} onIndexChange={setCurrentIdx} t={t} />
         }
 
         {scoreLabel && <p style={styles.scoreLabel}>{scoreLabel}</p>}

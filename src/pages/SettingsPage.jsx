@@ -127,7 +127,7 @@ export default function SettingsPage({ onNext, onBack }) {
         <motion.button 
           style={styles.btnStart} 
           onClick={() => { onNext('free', level); playClick(); }}
-          whileHover={{ scale: 1.02, backgroundColor: '#fff' }}
+          whileHover={{ scale: 1.02, backgroundColor: '#F5F0E8' }}
           whileTap={{ scale: 0.98 }}
         >
           {t('startWalk')}
