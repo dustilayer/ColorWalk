@@ -4,20 +4,24 @@ import { savePhoto, photoKey, deletePhotosForWalk, loadPhotosIntoWalk } from './
 const KEY = 'colorwalk_archive_v4'
 
 function sanitizeString(str) {
-  if (typeof str !== 'string') return str
   return DOMPurify.sanitize(str, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
 }
 
-// Sanitize walk record text fields before localStorage storage
-function sanitizeRecord(record) {
-  return {
-    ...record,
-    collectedColors: (record.collectedColors || []).map(c => ({
-      ...c,
-      name: sanitizeString(c.name),
-      hex: sanitizeString(c.hex),
-    })),
+// Recursively sanitize every string in a record tree (defense-in-depth before
+// localStorage write). Numbers/booleans/null pass through; objects/arrays recurse.
+function sanitizeDeep(value) {
+  if (typeof value === 'string') return sanitizeString(value)
+  if (Array.isArray(value)) return value.map(sanitizeDeep)
+  if (value !== null && typeof value === 'object') {
+    const out = {}
+    for (const k of Object.keys(value)) out[k] = sanitizeDeep(value[k])
+    return out
   }
+  return value
+}
+
+function sanitizeRecord(record) {
+  return sanitizeDeep(record)
 }
 
 export function getWalks() {

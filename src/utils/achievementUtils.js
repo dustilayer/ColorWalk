@@ -31,7 +31,19 @@ function getSeason(isoString) {
 
 function getUnlocked() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+    const now = Date.now()
+    const valid = {}
+    for (const [id, entry] of Object.entries(raw)) {
+      if (!entry || typeof entry !== 'object') continue
+      const t = Date.parse(entry.unlockedAt)
+      // Reject malformed or future timestamps (clock-tampered or hand-edited entries)
+      if (!Number.isFinite(t) || t > now) continue
+      // Reject mismatched checksum
+      if (entry.checksum !== makeChecksum(id, entry.unlockedAt)) continue
+      valid[id] = entry
+    }
+    return valid
   } catch {
     return {}
   }
