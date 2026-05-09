@@ -6,6 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext'
 import EndPage from './EndPage'
 import { Calendar, Palette, Star, Trophy } from 'lucide-react'
 import { hexToRgb } from '../utils/colorUtils'
+import { incrementStat } from '../utils/statsUtils'
 
 function getHue(hex) {
   const { r, g, b } = hexToRgb(hex)
@@ -272,6 +273,10 @@ function PerfectGridItem({ photo, index, onPress }) {
 export default function ArchivePage({ onStartWalk, onAchievements }) {
   const { t } = useLanguage()
   const [walks, setWalks] = useState(() => getWalks())
+
+  useEffect(() => {
+    incrementStat('viewArchiveCount')
+  }, [])
 
   async function handleDelete(id) {
     await deleteWalk(id)

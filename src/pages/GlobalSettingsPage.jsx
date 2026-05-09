@@ -3,6 +3,25 @@ import { motion } from 'motion/react'
 import { playClick, setClickVolume, setCaptureVolume, setBgmVolume } from '../utils/audio'
 import { Mail, Globe } from 'lucide-react'
 import { useLanguage } from '../contexts/LanguageContext'
+import {
+  getStats,
+  getTopColorNames,
+  getAveragePhotosPerWalk,
+  getTotalAchievements,
+} from '../utils/statsUtils'
+import { getReportOptIn, setReportOptIn } from '../utils/reportStats'
+
+function pickFavoritePacing(strictLevelCount, t) {
+  const order = ['precise', 'hunter', 'ambient']
+  let best = null
+  let bestCount = -1
+  for (const k of order) {
+    const c = strictLevelCount[k] || 0
+    if (c > bestCount) { best = k; bestCount = c }
+  }
+  if (bestCount <= 0) return null
+  return t(best)
+}
 
 export default function GlobalSettingsPage({ onBack }) {
   const { t, lang, changeLang } = useLanguage()
@@ -10,6 +29,24 @@ export default function GlobalSettingsPage({ onBack }) {
   const [captureVol, setCaptureVol] = useState(0.5)
   const [bgmVol, setBgmVol] = useState(0.5)
   const [theme, setTheme] = useState('system')
+  const [stats] = useState(() => getStats())
+  const [topColors] = useState(() => getTopColorNames(3))
+  const [reportOptIn, setReportOptInState] = useState(() => getReportOptIn())
+
+  const totalAchievements = getTotalAchievements()
+  const avgPhotos = getAveragePhotosPerWalk()
+  const favoritePacing = pickFavoritePacing(stats.strictLevelCount, t)
+  const warmCoolTotal = stats.warmColorCount + stats.coolColorCount
+  const warmPct = warmCoolTotal > 0 ? Math.round((stats.warmColorCount / warmCoolTotal) * 100) : 0
+  const coolPct = warmCoolTotal > 0 ? 100 - warmPct : 0
+  const hasData = stats.totalWalks > 0
+
+  const handleToggleOptIn = () => {
+    const next = !reportOptIn
+    setReportOptInState(next)
+    setReportOptIn(next)
+    playClick()
+  }
 
   useEffect(() => {
     // Load from localStorage
@@ -95,6 +132,119 @@ export default function GlobalSettingsPage({ onBack }) {
                 {l === 'zh' ? '中文' : l === 'en' ? 'EN' : l === 'ja' ? '日本語' : '한국어'}
               </motion.button>
             ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={styles.section}>
+        <h2 style={styles.sectionTitle}>{t('myReport')}</h2>
+        <div style={styles.card}>
+          {!hasData ? (
+            <p style={styles.emptyHint}>{t('noReportData')}</p>
+          ) : (
+            <>
+              <div style={styles.reportRow}>
+                <span style={styles.label}>{t('reportTotalWalks')}</span>
+                <span style={styles.reportValue}>{stats.totalWalks} {t('reportTimes')}</span>
+              </div>
+
+              {favoritePacing && (
+                <>
+                  <div style={styles.divider} />
+                  <div style={styles.reportRow}>
+                    <span style={styles.label}>{t('reportFavoritePacing')}</span>
+                    <span style={styles.reportValue}>{favoritePacing}</span>
+                  </div>
+                </>
+              )}
+
+              <div style={styles.divider} />
+              <div style={styles.reportRow}>
+                <span style={styles.label}>{t('reportAvgColors')}</span>
+                <span style={styles.reportValue}>{avgPhotos.toFixed(1)} {t('reportColorsUnit')}</span>
+              </div>
+
+              {warmCoolTotal > 0 && (
+                <>
+                  <div style={styles.divider} />
+                  <div style={{ ...styles.reportColumn }}>
+                    <span style={styles.label}>{t('reportWarmCool')}</span>
+                    <div style={styles.warmCoolBar}>
+                      <div style={{
+                        ...styles.warmCoolFill,
+                        width: `${warmPct}%`,
+                        background: 'linear-gradient(90deg, #F4845F, #E8504A)',
+                      }} />
+                      <div style={{
+                        ...styles.warmCoolFill,
+                        width: `${coolPct}%`,
+                        background: 'linear-gradient(90deg, #3D9BE9, #5B8DB8)',
+                      }} />
+                    </div>
+                    <div style={styles.warmCoolLegend}>
+                      <span>{t('reportWarm')} {warmPct}%</span>
+                      <span>{t('reportCool')} {coolPct}%</span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {topColors.length > 0 && (
+                <>
+                  <div style={styles.divider} />
+                  <div style={styles.reportColumn}>
+                    <span style={styles.label}>{t('reportTopColors')}</span>
+                    <div style={styles.topColorsRow}>
+                      {topColors.map((c, i) => (
+                        <div key={i} style={styles.topColorItem}>
+                          <div style={{
+                            ...styles.topColorSwatch,
+                            backgroundColor: c.hex || '#CCC',
+                          }} />
+                          <span style={styles.topColorName}>{c.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div style={styles.divider} />
+              <div style={styles.reportRow}>
+                <span style={styles.label}>{t('reportAchievements')}</span>
+                <span style={styles.reportValue}>{stats.achievementsUnlocked}/{totalAchievements}</span>
+              </div>
+
+              <div style={styles.divider} />
+              <div style={styles.reportRow}>
+                <span style={styles.label}>{t('reportStreak')}</span>
+                <span style={styles.reportValue}>{stats.consecutiveDays} {t('reportDays')}</span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div style={styles.section}>
+        <div style={styles.card}>
+          <div style={styles.row}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1, paddingRight: '1rem' }}>
+              <span style={styles.label}>{t('reportImprove')}</span>
+              <span style={styles.optInHint}>{t('reportImproveHint')}</span>
+            </div>
+            <button
+              onClick={handleToggleOptIn}
+              style={{
+                ...styles.toggle,
+                backgroundColor: reportOptIn ? 'rgba(26,23,20,0.8)' : 'rgba(26,23,20,0.15)',
+              }}
+              aria-pressed={reportOptIn}
+            >
+              <span style={{
+                ...styles.toggleKnob,
+                transform: reportOptIn ? 'translateX(20px)' : 'translateX(0)',
+              }} />
+            </button>
           </div>
         </div>
       </div>
@@ -256,5 +406,101 @@ const styles = {
     color: 'var(--text-color, #1A1714)',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-  }
+  },
+  emptyHint: {
+    fontFamily: '"Noto Serif SC", Georgia, serif',
+    fontSize: '0.85rem',
+    color: 'var(--text-muted, #7A6A5A)',
+    margin: 0,
+    textAlign: 'center',
+    padding: '0.5rem 0',
+    letterSpacing: '0.05em',
+  },
+  reportRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '1rem',
+  },
+  reportColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.65rem',
+  },
+  reportValue: {
+    fontFamily: '"Noto Serif SC", Georgia, serif',
+    fontSize: '0.95rem',
+    color: 'var(--text-color, #1A1714)',
+    letterSpacing: '0.05em',
+  },
+  warmCoolBar: {
+    display: 'flex',
+    width: '100%',
+    height: 10,
+    borderRadius: 6,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(26,23,20,0.06)',
+  },
+  warmCoolFill: {
+    height: '100%',
+  },
+  warmCoolLegend: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontFamily: '"Noto Serif SC", Georgia, serif',
+    fontSize: '0.78rem',
+    color: 'var(--text-muted, #7A6A5A)',
+    letterSpacing: '0.05em',
+  },
+  topColorsRow: {
+    display: 'flex',
+    gap: '0.75rem',
+  },
+  topColorItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.4rem',
+    flex: 1,
+  },
+  topColorSwatch: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    border: '1.5px solid rgba(255,255,255,0.7)',
+    boxShadow: '0 2px 6px rgba(26,23,20,0.08)',
+  },
+  topColorName: {
+    fontFamily: '"Noto Serif SC", Georgia, serif',
+    fontSize: '0.78rem',
+    color: 'var(--text-color, #1A1714)',
+    letterSpacing: '0.05em',
+    textAlign: 'center',
+  },
+  optInHint: {
+    fontFamily: '"Noto Serif SC", Georgia, serif',
+    fontSize: '0.75rem',
+    color: 'var(--text-muted, #7A6A5A)',
+    lineHeight: 1.4,
+    letterSpacing: '0.02em',
+  },
+  toggle: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    border: 'none',
+    padding: 2,
+    cursor: 'pointer',
+    transition: 'background-color 0.2s ease',
+    flexShrink: 0,
+  },
+  toggleKnob: {
+    display: 'block',
+    width: 20,
+    height: 20,
+    borderRadius: '50%',
+    backgroundColor: '#F5F0E8',
+    transition: 'transform 0.2s ease',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+  },
 }

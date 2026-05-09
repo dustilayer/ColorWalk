@@ -5,6 +5,7 @@ import { saveWalk, getWalks, loadPhotosIntoWalk } from '../utils/archive'
 import { downloadCard, shareCard } from '../utils/exportCard'
 import { useLanguage } from '../contexts/LanguageContext'
 import { checkAchievements } from '../utils/achievementUtils'
+import { incrementStat } from '../utils/statsUtils'
 import AchievementToast from '../components/AchievementToast'
 
 function formatDisplay(isoString) {
@@ -324,11 +325,13 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
   async function handleSaveArchive() {
     await saveWalk(record)
     setSaved(true)
+    incrementStat('saveToArchiveCount')
   }
 
   async function handleDownload() {
     setDownloading(true)
     await downloadCard(displayRecord, currentIdx)
+    incrementStat('saveToAlbumCount')
     setDownloading(false)
   }
 
@@ -339,6 +342,7 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
       if (!success) {
         await downloadCard(displayRecord, currentIdx)
       }
+      incrementStat('shareCount')
     } catch (e) {
       console.error(e)
     } finally {

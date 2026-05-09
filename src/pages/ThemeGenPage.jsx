@@ -6,6 +6,7 @@ import { playClick, playChime } from '../utils/audio'
 import { HexColorPicker } from 'react-colorful'
 import { Settings, X, BookOpen, Trophy, Volume2, VolumeX } from 'lucide-react'
 import { useLanguage } from '../contexts/LanguageContext'
+import { incrementStat } from '../utils/statsUtils'
 
 // 根据渐变两端均值亮度决定叠加文字颜色
 function textColors(startHex, endHex) {
@@ -236,6 +237,7 @@ export default function ThemeGenPage({ onNext, onOpenSettings, onOpenArchive, on
     setCustomStart(next.start.hex)
     setCustomEnd(next.end.hex)
     setCustomOpen(false)
+    incrementStat('regenerateThemeTotal')
   }
 
   const tc = textColors(displayTheme.start.hex, displayTheme.end.hex)
@@ -378,7 +380,12 @@ export default function ThemeGenPage({ onNext, onOpenSettings, onOpenArchive, on
         {/* 开始漫步：半透明白色 */}
         <motion.button
           style={s.btnStart}
-          onClick={e => { e.stopPropagation(); onNext(displayTheme); playClick(); }}
+          onClick={e => {
+            e.stopPropagation()
+            if (customOpen) incrementStat('customThemeCount')
+            onNext(displayTheme)
+            playClick()
+          }}
           whileHover={{ scale: 1.02, backgroundColor: 'rgba(255,255,255,0.95)' }}
           whileTap={{ scale: 0.98 }}
         >

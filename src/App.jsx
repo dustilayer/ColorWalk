@@ -9,6 +9,7 @@ import AchievementPage from './pages/AchievementPage'
 import { setClickVolume, setCaptureVolume, setBgmVolume, getBgmVolume } from './utils/audio'
 import { LanguageProvider } from './contexts/LanguageContext'
 import { savePhoto, photoKey } from './utils/storage'
+import { updateStatsAfterWalk } from './utils/statsUtils'
 import './App.css'
 
 const SCHEMA_VERSION = '1.0'
@@ -143,11 +144,12 @@ function AppContent() {
   }
 
   function handleSettingsNext(mode, strictLevel) {
-    setWalkConfig(c => ({ ...c, mode, strictLevel }))
+    setWalkConfig(c => ({ ...c, mode, strictLevel, startedAt: Date.now() }))
     setStep('camera')
   }
 
   function handleCameraEnd(collectedColors, matchScore) {
+    const durationMs = walkConfig.startedAt ? Date.now() - walkConfig.startedAt : 0
     const record = {
       id: Date.now().toString(),
       date: new Date().toISOString(),
@@ -156,7 +158,9 @@ function AppContent() {
       themeGradient: walkConfig.themeGradient,
       collectedColors,
       matchScore: matchScore ?? null,
+      durationMs,
     }
+    updateStatsAfterWalk(record)
     setCurrentRecord(record)
     setStep('end')
   }
