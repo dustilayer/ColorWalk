@@ -94,7 +94,8 @@ function AppContent() {
       const bgm = document.getElementById('bgm-player')
       if (bgm && bgm.paused && !bgmMuted) {
         bgm.volume = getBgmVolume()
-        bgm.play().catch(() => {})
+        bgm.play()
+          .catch((err) => console.warn('[BGM] play() failed:', err?.name, err?.message))
       }
       window.removeEventListener('click',      handleFirstInteraction)
       window.removeEventListener('touchstart', handleFirstInteraction)
@@ -116,7 +117,8 @@ function AppContent() {
     const bgm = document.getElementById('bgm-player')
     if (bgm && !bgmMuted) {
       bgm.volume = getBgmVolume()
-      bgm.play().catch(() => {})
+      bgm.play()
+        .catch((err) => console.warn('[BGM] track switch play() failed:', err?.name, err?.message))
     }
   }, [currentTrackIdx]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -128,7 +130,8 @@ function AppContent() {
     if (bgm) {
       bgm.muted = next
       if (!next && bgm.paused) {
-        bgm.play().catch(() => {})
+        bgm.play()
+          .catch((err) => console.warn('[BGM] toggle play() failed:', err?.name, err?.message))
       }
     }
   }
@@ -176,9 +179,17 @@ function AppContent() {
       <audio
         id="bgm-player"
         loop={false}
+        preload="auto"
         src={BGM_TRACKS[currentTrackIdx]}
         onEnded={handleBgmEnded}
-        onError={() => {}}
+        onError={(e) => {
+          const el = e.currentTarget
+          console.warn('[BGM] audio element error:', {
+            src: el.currentSrc,
+            errorCode: el.error?.code,
+            errorMessage: el.error?.message,
+          })
+        }}
       />
       {step === 'theme' && (
         <ThemeGenPage

@@ -28,32 +28,50 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
 
   useEffect(() => {
     let stream = null
+    let cancelled = false
     async function startCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.warn('[Camera] navigator.mediaDevices.getUserMedia unavailable — likely insecure context (need HTTPS or localhost)')
+        setError('当前环境不支持相机访问，请使用 HTTPS 或 localhost 打开')
+        return
+      }
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         })
-        if (videoRef.current) videoRef.current.srcObject = stream
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+        } else {
+          console.warn('[Camera] videoRef.current is null when stream arrived')
+        }
       } catch (err) {
+        console.warn('[Camera] getUserMedia failed:', err?.name, err?.message)
         const name = err.name || ''
         let msg
         if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
           msg = '请在系统设置中允许访问相机'
         } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
           msg = '未找到可用摄像头'
+        } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+          msg = '相机被其他应用占用，请关闭后重试'
         } else {
-          msg = '相机启动失败，请刷新重试'
+          msg = `相机启动失败 (${name || '未知错误'})，请刷新重试`
         }
         setError(msg)
       }
     }
     startCamera()
     return () => {
+      cancelled = true
       if (stream) stream.getTracks().forEach((t) => t.stop())
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [facingMode, t])
+  }, [facingMode])
 
   const toggleCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment')

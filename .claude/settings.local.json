@@ -14,7 +14,13 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(xxd)",
+      "Bash(curl -sI -o - http://localhost:3000/audio/bgm.mp3 --max-time 5)",
+      "Bash(curl -s -r 0-15 http://localhost:3000/audio/bgm.mp3 --max-time 5)",
+      "Bash(ffmpeg -version)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Test-Path *)"
     ]
   }
 }

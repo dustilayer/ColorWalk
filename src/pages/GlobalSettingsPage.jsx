@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { playClick, setClickVolume, setCaptureVolume, setBgmVolume } from '../utils/audio'
-import { Mail, Globe } from 'lucide-react'
 import { useLanguage } from '../contexts/LanguageContext'
 import {
   getStats,
@@ -310,20 +309,6 @@ export default function GlobalSettingsPage({ onBack }) {
         </div>
       </div>
 
-      <div style={styles.section}>
-        <h2 style={styles.sectionTitle}>{t('contactUs')}</h2>
-        <div style={styles.card}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Mail size={20} color="var(--text-muted, #7A6A5A)" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-color, #1A1714)' }}>{t('feedback')}</span>
-              <a href="mailto:backspace2026@yeah.net" style={{ fontSize: '0.85rem', color: 'var(--text-muted, #7A6A5A)', textDecoration: 'none' }}>
-                backspace2026@yeah.net
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
