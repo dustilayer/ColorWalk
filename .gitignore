@@ -10,3 +10,28 @@ coverage/
 .vercel
 temp_repo/
 .claude/
+
+# Environment variables (Vercel / Supabase / API keys)
+.env
+.env.*
+!.env.example
+*.env.local
+*.env.production
+*.env.development
+
+# Sensitive files
+*.key
+*.pem
+*.cert
+*.p12
+*.pfx
+*.jks
+secrets.json
+credentials.json
+
+# Editor / IDE local config
+.vscode/settings.json
+.idea/
+
+# OS-generated files
+Thumbs.db
