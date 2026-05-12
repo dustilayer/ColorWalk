@@ -2,8 +2,8 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    # 每 6 天的 UTC 凌晨 3 点跑一次(避免和真实用户流量冲突)
-    - cron: '0 3 */6 * *'
+    # 每月 5/10/15/20/25/30 日 UTC 凌晨 3 点触发(最长间隔 6 天,留 1 天裕量避开 Supabase 7 天暂停红线)
+    - cron: '0 3 */5 * *'
   workflow_dispatch:
     # 允许手动触发,方便测试
 
