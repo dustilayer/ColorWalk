@@ -7,6 +7,10 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { checkAchievements } from '../utils/achievementUtils'
 import { incrementStat } from '../utils/statsUtils'
 import AchievementToast from '../components/AchievementToast'
+import { reportWalk } from '../lib/reportWalk'
+
+// 严格度等级映射到整数(给后端统计用)
+const STRICT_TO_INT = { ambient: 1, hunter: 2, precise: 3 }
 
 function formatDisplay(isoString) {
   const d = new Date(isoString)
@@ -314,6 +318,23 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
 
   useEffect(() => {
     if (readonly) return
+
+    // ─── 匿名上报(一次性,刷新页面不重复)─────────────
+    const fingerprint = `${record.date}_${record.mode}_${record.collectedColors.length}`
+    const reportKey = `cw_reported_${fingerprint}`
+    if (!sessionStorage.getItem(reportKey)) {
+      sessionStorage.setItem(reportKey, '1')
+      reportWalk({
+        sessionId:   crypto.randomUUID(),
+        mode:        record.mode === 'single' ? 'single' : 'multi',
+        strictness:  STRICT_TO_INT[record.strictLevel] ?? 1,
+        durationSec: Math.round((record.durationMs ?? 0) / 1000),
+        colorCount:  record.collectedColors.length,
+        language:    (typeof navigator !== 'undefined' && navigator.language?.slice(0, 2)) || 'zh',
+      })
+    }
+    // ──────────────────────────────────────────────
+
     const allRecords = [record, ...getWalks()]
     const unlocked = checkAchievements(record, allRecords)
     if (unlocked.length > 0) setNewAchievements(unlocked)
