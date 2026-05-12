@@ -1,0 +1,30 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # 每 6 天的 UTC 凌晨 3 点跑一次(避免和真实用户流量冲突)
+    - cron: '0 3 */6 * *'
+  workflow_dispatch:
+    # 允许手动触发,方便测试
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          echo "Pinging Supabase to keep the project alive..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X HEAD \
+            "https://llzvehbqnlgclwgvgpzf.supabase.co/rest/v1/" \
+            -H "apikey: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}")
+          echo "Got HTTP status: $STATUS"
+          # 2xx 或 4xx 都算成功(只要服务端响应了,就说明项目活着)
+          # 401/403 也接受(说明 API 通了,只是 key 鉴权问题不影响保活)
+          if [[ "$STATUS" =~ ^[24] ]]; then
+            echo "✓ Supabase is alive"
+            exit 0
+          else
+            echo "✗ Unexpected status code, project might be down"
+            exit 1
+          fi
