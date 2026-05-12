@@ -15,7 +15,8 @@ jobs:
         run: |
           echo "Pinging Supabase to keep the project alive..."
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X HEAD \
+            --max-time 10 \
+            -X GET \
             "https://llzvehbqnlgclwgvgpzf.supabase.co/rest/v1/" \
             -H "apikey: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}")
           echo "Got HTTP status: $STATUS"
