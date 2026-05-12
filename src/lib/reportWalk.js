@@ -19,7 +19,7 @@ export async function reportWalk(payload) {
         duration_sec: payload.durationSec,
         color_count:  payload.colorCount,
         language:     payload.language,
-        app_version:  'v1.0',
+        app_version:  payload.appVersion ?? 'v1.0',
       })
 
     if (error) {
