@@ -422,53 +422,55 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
         {scoreLabel && <p style={styles.scoreLabel}>{scoreLabel}</p>}
       </div>
 
-      {!readonly && (
-        <div style={styles.actions}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <motion.button 
-              style={{ ...styles.btnSecondary, flex: 1 }} 
-              onClick={handleDownload} 
-              disabled={downloading}
-              whileHover={{ scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' }}
-              whileTap={{ scale: 0.98 }}
-            >
-              {downloading ? '...' : t('downloadCard')}
-            </motion.button>
-            <motion.button 
-              style={{ ...styles.btnSecondary, flex: 1 }} 
-              onClick={handleShare} 
-              disabled={sharing}
-              whileHover={{ scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' }}
-              whileTap={{ scale: 0.98 }}
-            >
-              {sharing ? '...' : t('share')}
-            </motion.button>
-          </div>
+      <div style={styles.actions}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
           <motion.button
-            style={saved ? styles.btnSaved : styles.btnSecondary}
-            onClick={handleSaveArchive}
-            disabled={saved}
-            whileHover={!saved ? { scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' } : {}}
-            whileTap={!saved ? { scale: 0.98 } : {}}
-          >
-            {saved ? t('saved') : t('saveArchive')}
-          </motion.button>
-          <motion.button 
-            style={styles.btnPrimary} 
-            onClick={() => { onWalkAgain(); }}
-            whileHover={{ scale: 1.02, backgroundColor: '#333' }}
+            style={{ ...styles.btnSecondary, flex: 1 }}
+            onClick={handleDownload}
+            disabled={downloading}
+            whileHover={{ scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' }}
             whileTap={{ scale: 0.98 }}
-          >{t('walkAgain')}</motion.button>
-          {saved && (
-            <motion.button 
-              style={styles.btnViewArchive} 
-              onClick={() => { onViewArchive(); }}
-              whileHover={{ scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' }}
-              whileTap={{ scale: 0.98 }}
-            >{t('viewArchive')}</motion.button>
-          )}
+          >
+            {downloading ? '...' : t('downloadCard')}
+          </motion.button>
+          <motion.button
+            style={{ ...styles.btnSecondary, flex: 1 }}
+            onClick={handleShare}
+            disabled={sharing}
+            whileHover={{ scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {sharing ? '...' : t('share')}
+          </motion.button>
         </div>
-      )}
+        {!readonly && (
+          <>
+            <motion.button
+              style={saved ? styles.btnSaved : styles.btnSecondary}
+              onClick={handleSaveArchive}
+              disabled={saved}
+              whileHover={!saved ? { scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' } : {}}
+              whileTap={!saved ? { scale: 0.98 } : {}}
+            >
+              {saved ? t('saved') : t('saveArchive')}
+            </motion.button>
+            <motion.button
+              style={styles.btnPrimary}
+              onClick={() => { onWalkAgain(); }}
+              whileHover={{ scale: 1.02, backgroundColor: '#333' }}
+              whileTap={{ scale: 0.98 }}
+            >{t('walkAgain')}</motion.button>
+            {saved && (
+              <motion.button
+                style={styles.btnViewArchive}
+                onClick={() => { onViewArchive(); }}
+                whileHover={{ scale: 1.02, backgroundColor: 'rgba(26,23,20,0.05)' }}
+                whileTap={{ scale: 0.98 }}
+              >{t('viewArchive')}</motion.button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
