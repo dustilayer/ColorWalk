@@ -10,6 +10,14 @@ import {
 } from '../utils/statsUtils'
 import { getReportOptIn, setReportOptIn } from '../utils/reportStats'
 
+const LANG_OPTIONS = [
+  { code: 'zh',    label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
+  { code: 'en',    label: 'EN' },
+  { code: 'ja',    label: '日本語' },
+  { code: 'ko',    label: '한국어' },
+]
+
 function pickFavoritePacing(strictLevelCount, t) {
   const order = ['precise', 'hunter', 'ambient']
   let best = null
@@ -116,19 +124,19 @@ export default function GlobalSettingsPage({ onBack }) {
         <h2 style={styles.sectionTitle}>{t('language')}</h2>
         <div style={styles.card}>
           <div style={styles.themeGroup}>
-            {['zh', 'en', 'ja', 'ko'].map(l => (
+            {LANG_OPTIONS.map(({ code, label }) => (
               <motion.button
-                key={l}
+                key={code}
                 style={{
                   ...styles.themeBtn,
-                  backgroundColor: lang === l ? 'rgba(26,23,20,0.08)' : 'transparent',
-                  borderColor: lang === l ? 'rgba(26,23,20,0.2)' : 'transparent',
+                  backgroundColor: lang === code ? 'rgba(26,23,20,0.08)' : 'transparent',
+                  borderColor: lang === code ? 'rgba(26,23,20,0.2)' : 'transparent',
                 }}
-                onClick={() => { changeLang(l); playClick(); }}
+                onClick={() => { changeLang(code); playClick(); }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                {l === 'zh' ? '中文' : l === 'en' ? 'EN' : l === 'ja' ? '日本語' : '한국어'}
+                {label}
               </motion.button>
             ))}
           </div>

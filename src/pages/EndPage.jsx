@@ -324,13 +324,28 @@ export default function EndPage({ record, readonly, onWalkAgain, onViewArchive, 
     const reportKey = `cw_reported_${fingerprint}`
     if (!sessionStorage.getItem(reportKey)) {
       sessionStorage.setItem(reportKey, '1')
+      const browserLang = (typeof navigator !== 'undefined' && navigator.language || '').toLowerCase()
+      let reportLang = 'zh'
+      if (browserLang.startsWith('zh-tw') || browserLang.startsWith('zh-hant')) {
+        reportLang = 'zh-TW'
+      } else if (browserLang.startsWith('zh-hk')) {
+        reportLang = 'zh-TW'
+      } else if (browserLang.startsWith('zh')) {
+        reportLang = 'zh'
+      } else if (browserLang.startsWith('en')) {
+        reportLang = 'en'
+      } else if (browserLang.startsWith('ja')) {
+        reportLang = 'ja'
+      } else if (browserLang.startsWith('ko')) {
+        reportLang = 'ko'
+      }
       reportWalk({
         sessionId:   crypto.randomUUID(),
         mode:        record.mode === 'single' ? 'single' : 'multi',
         strictness:  STRICT_TO_INT[record.strictLevel] ?? 1,
         durationSec: Math.round((record.durationMs ?? 0) / 1000),
         colorCount:  record.collectedColors.length,
-        language:    (typeof navigator !== 'undefined' && navigator.language?.slice(0, 2)) || 'zh',
+        language:    reportLang,
       })
     }
     // ──────────────────────────────────────────────
