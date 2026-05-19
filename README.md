@@ -326,6 +326,18 @@ docs/screenshots/    README 截图(待补)
 - [x] Supabase 匿名上报 + RLS + CHECK 约束
 - [x] Vercel 自动部署
 
+### 当前迭代(用户反馈驱动)
+
+基于 2026-05-12 首批真实用户反馈,以下问题已转为 GitHub Issues 跟踪:
+
+- [ ] [#1 白色主导场景下的颜色识别准确性问题](https://github.com/dustilayer/ColorWalk/issues/1) · 优先级 高
+- [ ] [#2 存档页面缺少"下载色卡"按钮](https://github.com/dustilayer/ColorWalk/issues/2) · 优先级 中
+- [ ] [#3 初始随机主题颜色权重偏向白色调](https://github.com/dustilayer/ColorWalk/issues/3) · 优先级 中
+- [ ] [#4 产品反思 — 模式选择向用户展示实现细节](https://github.com/dustilayer/ColorWalk/issues/4) · 讨论
+- [ ] [#5 目标颜色粒度 — 宽泛的类别与精确的颜色名称](https://github.com/dustilayer/ColorWalk/issues/5) · 讨论
+
+→ 查看所有 [Open Issues](https://github.com/dustilayer/ColorWalk/issues)
+
 ### 二期(规划中)
 - [ ] UI 美化(动效细化、视觉重构)
 - [ ] 日历视图档案(每日色卡渲染为日历上的彩色圆点,情感化数据可视化)
