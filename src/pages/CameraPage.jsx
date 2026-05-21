@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'motion/react'
-import { findNearestColor, rgbToHex, computeMatchScore } from '../utils/colorUtils'
+import { findNearestColor, rgbToHex, computeMatchScore, extractDominantColor } from '../utils/colorUtils'
 import { playClick, playChime, playCaptureSound, playPerfectCaptureSound } from '../utils/audio'
 import { SwitchCamera, Undo2, Redo2 } from 'lucide-react'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -85,33 +85,20 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
       return
     }
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    
-    // Handle mirroring for front camera
-    if (facingMode === 'user') {
-      ctx.translate(canvas.width, 0)
-      ctx.scale(-1, 1)
-    }
-    ctx.drawImage(video, 0, 0)
+    const w = 64
+    const h = Math.max(1, Math.round(64 * video.videoHeight / video.videoWidth))
+    canvas.width = w
+    canvas.height = h
+    ctx.drawImage(video, 0, 0, w, h)
 
-    const cx = Math.floor(canvas.width / 2)
-    const cy = Math.floor(canvas.height / 2)
-    const region = 5, half = Math.floor(region / 2)
-    const data = ctx.getImageData(cx - half, cy - half, region, region).data
-
-    let sumR = 0, sumG = 0, sumB = 0
-    const pixels = region * region
-    for (let i = 0; i < pixels; i++) {
-      sumR += data[i * 4]; sumG += data[i * 4 + 1]; sumB += data[i * 4 + 2]
-    }
+    const { r, g, b } = extractDominantColor(ctx.getImageData(0, 0, w, h))
     const s = smoothRef.current
-    s.r = lerp(s.r, Math.round(sumR / pixels), 0.15)
-    s.g = lerp(s.g, Math.round(sumG / pixels), 0.15)
-    s.b = lerp(s.b, Math.round(sumB / pixels), 0.15)
+    s.r = lerp(s.r, r, 0.15)
+    s.g = lerp(s.g, g, 0.15)
+    s.b = lerp(s.b, b, 0.15)
     setLiveColor({ r: s.r, g: s.g, b: s.b, hex: rgbToHex(s.r, s.g, s.b), name: findNearestColor(s.r, s.g, s.b) })
     rafRef.current = requestAnimationFrame(sample)
-  }, [facingMode])
+  }, [])
 
   const handleVideoPlay = useCallback(() => {
     rafRef.current = requestAnimationFrame(sample)
@@ -305,23 +292,11 @@ export default function CameraPage({ walkConfig, onEnd, onArchive }) {
         >{t('archive')}</motion.button>
       </div>
 
-        {/* 准星区 */}
+        {/* 分数读数区 */}
         <div style={styles.reticleWrap}>
           <div style={{ ...styles.scoreWrap, opacity: canCapture ? 1 : 0.5, backgroundColor: canCapture ? 'rgba(245,240,232,0.9)' : 'rgba(245,240,232,0.4)' }}>
             <span style={styles.scoreText}>{matchScore}% / {threshold}%</span>
           </div>
-          <motion.div 
-            animate={flash ? { scale: [1, 0.8, 1.3, 1] } : { scale: 1 }}
-            transition={{ duration: 0.4 }}
-            style={{
-              ...styles.reticle,
-              borderColor: canCapture ? liveColor.hex : 'rgba(245,240,232,0.4)',
-              boxShadow: canCapture
-                ? `0 0 0 1.5px ${liveColor.hex}, 0 0 14px ${liveColor.hex}55`
-                : `0 0 0 1px rgba(0,0,0,0.1), 0 0 0 2px rgba(245,240,232,0.3)`,
-              transition: 'all 0.4s ease-in-out',
-            }} 
-          />
         </div>
 
       {/* 底部面板 */}
@@ -522,12 +497,6 @@ const styles = {
     fontSize: '0.85rem',
     color: '#1A1714',
     letterSpacing: '0.08em',
-  },
-  reticle: {
-    width: 40,
-    height: 40,
-    borderRadius: '50%',
-    border: '2px solid rgba(245,240,232,0.85)',
   },
   panel: {
     position: 'absolute',

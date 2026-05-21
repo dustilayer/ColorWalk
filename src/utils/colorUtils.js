@@ -132,6 +132,42 @@ export function rgbToHue(r, g, b) {
   return (h / 6) * 360
 }
 
+// ── 主色提取（占比最大的颜色桶）──────────────────────────────────
+
+export function extractDominantColor(imageData) {
+  const data = imageData.data
+  const bucketSize = 32
+  const buckets = new Map()
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2]
+    const qr = Math.round(r / bucketSize) * bucketSize
+    const qg = Math.round(g / bucketSize) * bucketSize
+    const qb = Math.round(b / bucketSize) * bucketSize
+    const key = qr * 65536 + qg * 256 + qb
+    const bucket = buckets.get(key)
+    if (bucket) {
+      bucket.count++
+      bucket.sumR += r
+      bucket.sumG += g
+      bucket.sumB += b
+    } else {
+      buckets.set(key, { count: 1, sumR: r, sumG: g, sumB: b })
+    }
+  }
+
+  let best = null
+  for (const bucket of buckets.values()) {
+    if (!best || bucket.count > best.count) best = bucket
+  }
+  if (!best) return { r: 128, g: 128, b: 128 }
+  return {
+    r: Math.round(best.sumR / best.count),
+    g: Math.round(best.sumG / best.count),
+    b: Math.round(best.sumB / best.count),
+  }
+}
+
 // ── 匹配得分（0–100，越高越接近主题色带）────────────────────────────
 
 export function computeMatchScore(rgb, themeGradient) {
