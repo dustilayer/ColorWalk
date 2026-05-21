@@ -1,5 +1,3 @@
-import { rgbToHue } from './colorUtils'
-
 const W = 750
 const H = 1000
 
@@ -17,19 +15,71 @@ function luminance(r, g, b) {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255
 }
 
-// ── 单色模式色卡 ──────────────────────────────────────────────────
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('Image load failed'))
+    img.src = src
+  })
+}
 
-function drawSingleCard(ctx, record, activeIndex = 0) {
+function drawImageCover(ctx, img, dx, dy, dw, dh) {
+  const srcRatio = img.width / img.height
+  const dstRatio = dw / dh
+  let sx, sy, sw, sh
+  if (srcRatio > dstRatio) {
+    // 源图更宽：按高度铺满，裁切左右
+    sh = img.height
+    sw = sh * dstRatio
+    sx = (img.width - sw) / 2
+    sy = 0
+  } else {
+    // 源图更高：按宽度铺满，裁切上下
+    sw = img.width
+    sh = sw / dstRatio
+    sx = 0
+    sy = (img.height - sh) / 2
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh)
+}
+
+// ── 色卡（每色一张：照片在上，色块在下）────────────────────────────
+
+async function drawColorCard(ctx, record, activeIndex = 0) {
   const { themeGradient, collectedColors, matchScore, date, strictLevel } = record
   const hit = collectedColors[activeIndex] || collectedColors[0]
 
-  // 上半：主题渐变（60%）
+  // 零采集守卫：宣纸色铺底 + 日期，避免崩
+  if (!hit) {
+    ctx.fillStyle = '#F5F0E8'
+    ctx.fillRect(0, 0, W, H)
+    ctx.textAlign = 'center'
+    ctx.font = `400 20px "Noto Serif SC", "Microsoft YaHei", Georgia, serif`
+    ctx.fillStyle = 'rgba(26,23,20,0.5)'
+    ctx.fillText(formatDate(date), W / 2, H - 60)
+    return
+  }
+
+  // 上半：实拍照片（60%），缺失/加载失败时回退到主题渐变
   const gradH = Math.round(H * 0.6)
-  const grad = ctx.createLinearGradient(0, 0, W, 0)
-  grad.addColorStop(0, themeGradient.start.hex)
-  grad.addColorStop(1, themeGradient.end.hex)
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, W, gradH)
+  let drewPhoto = false
+  if (hit && hit.photoUrl) {
+    try {
+      const img = await loadImage(hit.photoUrl)
+      drawImageCover(ctx, img, 0, 0, W, gradH)
+      drewPhoto = true
+    } catch {
+      // 加载失败，走回退
+    }
+  }
+  if (!drewPhoto) {
+    const grad = ctx.createLinearGradient(0, 0, W, 0)
+    grad.addColorStop(0, themeGradient.start.hex)
+    grad.addColorStop(1, themeGradient.end.hex)
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, W, gradH)
+  }
 
   // 下半：命中色（40%）
   const hitY = gradH
@@ -62,55 +112,6 @@ function drawSingleCard(ctx, record, activeIndex = 0) {
   }
 }
 
-// ── 自由模式色卡 ──────────────────────────────────────────────────
-
-function drawFreeCard(ctx, record) {
-  const { themeGradient, collectedColors, date } = record
-
-  const STRIP_H = 40
-  const FOOTER_H = 80
-  const GRID_H = H - STRIP_H - FOOTER_H
-
-  // 顶部细条：主题渐变
-  const grad = ctx.createLinearGradient(0, 0, W, 0)
-  grad.addColorStop(0, themeGradient.start.hex)
-  grad.addColorStop(1, themeGradient.end.hex)
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, W, STRIP_H)
-
-  // 色块网格（按色相排序）
-  const sorted = [...collectedColors].sort(
-    (a, b) => rgbToHue(a.r, a.g, a.b) - rgbToHue(b.r, b.g, b.b)
-  )
-  const n = sorted.length
-  if (n > 0) {
-    const cols = Math.min(n, 4)
-    const rows = Math.ceil(n / cols)
-    const sw = W / cols
-    const sh = GRID_H / rows
-    sorted.forEach((c, i) => {
-      const col = i % cols
-      const row = Math.floor(i / cols)
-      ctx.fillStyle = c.hex
-      ctx.fillRect(col * sw, STRIP_H + row * sh, sw, sh)
-    })
-  } else {
-    // 无采集色时填充宣纸色
-    ctx.fillStyle = '#F5F0E8'
-    ctx.fillRect(0, STRIP_H, W, GRID_H)
-  }
-
-  // 底部：宣纸色 footer
-  ctx.fillStyle = '#F5F0E8'
-  ctx.fillRect(0, H - FOOTER_H, W, FOOTER_H)
-
-  // 日期
-  ctx.textAlign = 'center'
-  ctx.font = `400 20px "Noto Serif SC", "Microsoft YaHei", Georgia, serif`
-  ctx.fillStyle = 'rgba(26,23,20,0.5)'
-  ctx.fillText(formatDate(date), W / 2, H - FOOTER_H / 2 + 8)
-}
-
 // ── 导出入口 ──────────────────────────────────────────────────────
 
 export async function downloadCard(record, activeIndex = 0) {
@@ -121,11 +122,7 @@ export async function downloadCard(record, activeIndex = 0) {
   canvas.height = H
   const ctx = canvas.getContext('2d')
 
-  if (record.mode === 'single') {
-    drawSingleCard(ctx, record, activeIndex)
-  } else {
-    drawFreeCard(ctx, record)
-  }
+  await drawColorCard(ctx, record, activeIndex)
 
   const url = canvas.toDataURL('image/png')
   const a = document.createElement('a')
@@ -142,11 +139,7 @@ export async function shareCard(record, activeIndex = 0) {
   canvas.height = H
   const ctx = canvas.getContext('2d')
 
-  if (record.mode === 'single') {
-    drawSingleCard(ctx, record, activeIndex)
-  } else {
-    drawFreeCard(ctx, record)
-  }
+  await drawColorCard(ctx, record, activeIndex)
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(async (blob) => {
