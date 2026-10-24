@@ -46,7 +46,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff,woff2,ttf}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /supabase\.co/, /^\/(?:privacy|support)\.html(?:[?#]|$)/],
+        navigateFallbackDenylist: [/^\/api\//, /supabase\.co/, /^\/(?:privacy|support|ios-support)\.html(?:[?#]|$)/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
