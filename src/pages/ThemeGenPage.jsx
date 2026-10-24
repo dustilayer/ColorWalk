@@ -391,6 +391,10 @@ export default function ThemeGenPage({ onNext, onOpenSettings, onOpenArchive, on
         >
           {t('startWalk')}
         </motion.button>
+        <nav aria-label="隐私与支持 / Privacy and support" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '1rem', marginTop: '.6rem', font: '.8rem system-ui, sans-serif' }}>
+          <a href="/privacy.html" style={{ color: '#fff', padding: '.35rem', textUnderlineOffset: '.2em' }}>隐私 / Privacy</a>
+          <a href="/support.html" style={{ color: '#fff', padding: '.35rem', textUnderlineOffset: '.2em' }}>支持 / Support</a>
+        </nav>
       </div>
     </div>
   )
