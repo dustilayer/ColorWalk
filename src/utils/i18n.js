@@ -81,8 +81,9 @@ export const translations = {
     reportAchievements: '已解锁印记',
     reportStreak: '连续使用',
     reportDays: '天',
-    reportImprove: '帮助改进 Color Walk',
-    reportImproveHint: '开启后将匿名发送使用统计，不包含任何照片和个人信息',
+    reportImprove: "统计偏好（功能未接入）",
+    reportImproveHint: "此开关仅在本机保存偏好，对应功能尚未接入发送。它不控制漫步结束页的统计上报；关闭不能保证停止发送。",
+    reportPrivacyPolicy: "隐私政策",
   },
   'zh-TW': {
     todayTheme: '今日主題色',
@@ -166,8 +167,9 @@ export const translations = {
     reportAchievements: '已解鎖印記',
     reportStreak: '連續使用',
     reportDays: '天',
-    reportImprove: '幫助改進 Color Walk',
-    reportImproveHint: '開啟後將匿名傳送使用統計，不包含任何照片和個人資訊',
+    reportImprove: "統計偏好（功能未接入）",
+    reportImproveHint: "此開關只在本機儲存偏好，對應功能尚未接入傳送。它不控制漫步結束頁的統計上報；關閉不能保證停止傳送。",
+    reportPrivacyPolicy: "隱私政策",
   },
   en: {
     todayTheme: "Today's Hue",
@@ -251,8 +253,9 @@ export const translations = {
     reportAchievements: 'Achievements unlocked',
     reportStreak: 'Current streak',
     reportDays: 'days',
-    reportImprove: 'Help improve Color Walk',
-    reportImproveHint: 'Sends anonymous usage stats — no photos or personal info',
+    reportImprove: "Statistics preference (not connected)",
+    reportImproveHint: "This switch only saves a preference on this device; its feature does not send reports yet. It does not control reporting when a walk ends. Turning it off does not guarantee reporting stops.",
+    reportPrivacyPolicy: "Privacy policy",
   },
   ja: {
     todayTheme: '本日の色',
@@ -331,8 +334,9 @@ export const translations = {
     reportAchievements: '解錠した称号',
     reportStreak: '連続使用',
     reportDays: '日',
-    reportImprove: 'Color Walk の改善に協力',
-    reportImproveHint: '匿名の利用統計を送信します。写真や個人情報は含みません',
+    reportImprove: "統計の設定（未接続）",
+    reportImproveHint: "このスイッチは端末に設定を保存するだけで、対応する送信機能は未接続です。散策終了時の統計送信は制御しません。オフにしても送信が停止するとは限りません。",
+    reportPrivacyPolicy: "プライバシーポリシー",
   },
   ko: {
     todayTheme: '오늘의 색',
@@ -411,7 +415,8 @@ export const translations = {
     reportAchievements: '해제된 인장',
     reportStreak: '연속 사용',
     reportDays: '일',
-    reportImprove: 'Color Walk 개선에 도움 주기',
-    reportImproveHint: '익명 사용 통계를 전송합니다. 사진이나 개인 정보는 포함되지 않습니다',
+    reportImprove: "통계 설정 (미연결)",
+    reportImproveHint: "이 스위치는 기기에 설정만 저장하며 해당 전송 기능은 아직 연결되지 않았습니다. 산책 종료 시 통계 전송은 제어하지 않습니다. 꺼도 전송 중단을 보장하지 않습니다.",
+    reportPrivacyPolicy: "개인정보 처리방침",
   }
 };

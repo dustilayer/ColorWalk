@@ -237,7 +237,8 @@ export default function GlobalSettingsPage({ onBack }) {
           <div style={styles.row}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1, paddingRight: '1rem' }}>
               <span style={styles.label}>{t('reportImprove')}</span>
-              <span style={styles.optInHint}>{t('reportImproveHint')}</span>
+              <span id="report-preference-hint" style={styles.optInHint}>{t('reportImproveHint')}</span>
+              <a href="/privacy.html" style={{ ...styles.optInHint, textUnderlineOffset: '.2em' }}>{t('reportPrivacyPolicy')}</a>
             </div>
             <button
               onClick={handleToggleOptIn}
@@ -245,6 +246,8 @@ export default function GlobalSettingsPage({ onBack }) {
                 ...styles.toggle,
                 backgroundColor: reportOptIn ? 'rgba(26,23,20,0.8)' : 'rgba(26,23,20,0.15)',
               }}
+              aria-label={t('reportImprove')}
+              aria-describedby="report-preference-hint"
               aria-pressed={reportOptIn}
             >
               <span style={{
